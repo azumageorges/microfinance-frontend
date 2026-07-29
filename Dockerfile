@@ -11,8 +11,15 @@ ENV FLUTTER_HOME=/opt/flutter
 
 ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
 
+# Empêche les erreurs de permissions lors de l'extraction tar
+ENV TAR_OPTIONS="--no-same-owner"
 
-# Dépendances nécessaires Flutter
+
+
+# ==========================================
+# Installation des dépendances nécessaires
+# ==========================================
+
 RUN apt-get update && apt-get install -y \
     curl \
     git \
@@ -25,7 +32,11 @@ RUN apt-get update && apt-get install -y \
 
 
 
-# Installation Flutter version fixe
+# ==========================================
+# Installation Flutter 3.44.7
+# (Dart 3.12.2 compatible avec sdk ^3.12.2)
+# ==========================================
+
 RUN git clone https://github.com/flutter/flutter.git \
     -b 3.44.7 \
     --depth 1 \
@@ -38,32 +49,48 @@ RUN git config --global --add safe.directory ${FLUTTER_HOME}
 
 
 
-# Vérification Flutter/Dart
+# Vérification version Flutter/Dart
 RUN flutter --version
 
 
+
+# ==========================================
+# Préparation du projet
+# ==========================================
 
 WORKDIR /app
 
 
 
-# Cache des dépendances
+# Copie des fichiers de dépendances
 COPY pubspec.yaml pubspec.lock ./
 
 
+
+# Activation Flutter Web
 RUN flutter config --enable-web
 
 
-RUN flutter pub get
+
+# Préchargement des composants Web
+RUN flutter precache --web
 
 
 
-# Copie du projet
+# Installation des dépendances
+RUN flutter pub get --verbose
+
+
+
+# Copie du reste du projet
 COPY . .
 
 
 
+# ==========================================
 # Compilation Flutter Web
+# ==========================================
+
 RUN flutter build web \
     --release \
     --dart-define=API_BASE_URL=https://microfinance-backend-etz5.onrender.com
@@ -71,18 +98,21 @@ RUN flutter build web \
 
 
 
+
 # ==========================================
-# Étape 2 : Serveur Nginx
+# Étape 2 : Serveur Nginx Production
 # ==========================================
 
 FROM nginx:alpine
 
 
 
+# Configuration SPA Flutter
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 
 
+# Copie du build Flutter
 COPY --from=build-env \
     /app/build/web \
     /usr/share/nginx/html
