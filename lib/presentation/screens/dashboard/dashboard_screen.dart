@@ -240,24 +240,29 @@ class _TransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCredit = tx.isCredit;
+    final color = !tx.isExecuted && tx.isSensitive
+        ? AppTheme.warning
+        : (isCredit ? AppTheme.success : AppTheme.error);
+    final icon = tx.typeTransaction == 'TRANSFERT'
+        ? Icons.swap_horiz
+        : (isCredit ? Icons.arrow_downward : Icons.arrow_upward);
     return ListTile(
       dense: true,
       leading: Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: (isCredit ? AppTheme.success : AppTheme.error)
-              .withValues(alpha: 0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
-          isCredit ? Icons.arrow_downward : Icons.arrow_upward,
-          color: isCredit ? AppTheme.success : AppTheme.error,
+          icon,
+          color: color,
           size: 18,
         ),
       ),
       title: Text(
-        tx.typeLabel,
+        '${tx.typeLabel} • ${tx.statutLabel}',
         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
       subtitle: Text(
@@ -273,7 +278,7 @@ class _TransactionTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: isCredit ? AppTheme.success : AppTheme.error,
+              color: color,
             ),
           ),
           Text(

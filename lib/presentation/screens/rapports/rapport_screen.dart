@@ -93,8 +93,10 @@ class _RapportScreenState extends ConsumerState<RapportScreen> {
               data: (allTx) {
                 // Filtrer par mois/année sélectionnés
                 final txMois = allTx.where((tx) {
-                  return tx.dateTransaction.month == _moisSelectionne &&
-                      tx.dateTransaction.year == _anneeSelectionnee;
+                  if (!tx.isExecuted) return false;
+                  final dateReference = tx.dateExecution ?? tx.dateTransaction;
+                  return dateReference.month == _moisSelectionne &&
+                      dateReference.year == _anneeSelectionnee;
                 }).toList();
 
                 final totalDepots = txMois

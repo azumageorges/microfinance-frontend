@@ -95,9 +95,15 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
       ref.invalidate(comptesProvider);
 
       if (mounted) {
+        final successMessage = switch (widget.type) {
+          'depot' => 'Dépôt effectué avec succès',
+          'retrait' => 'Demande de retrait envoyée au gestionnaire',
+          'transfert' => 'Demande de transfert envoyée au gestionnaire',
+          _ => 'Opération enregistrée',
+        };
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$_title effectué avec succès'),
+            content: Text(successMessage),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -265,7 +271,9 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
                                         strokeWidth: 2,
                                         color: Colors.white),
                                   )
-                                : Text('Valider le $_title'),
+                                : Text(widget.type == 'depot'
+                                    ? 'Exécuter le $_title'
+                                    : 'Envoyer la demande'),
                           ),
                         ],
                       ),

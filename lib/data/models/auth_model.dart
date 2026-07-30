@@ -51,9 +51,9 @@ class AuthResponse {
   bool get canAccessDashboard => isAdmin || isGestionnaire;
   bool get canAccessUtilisateurs => isAdmin;
   bool get canManageComptes => isAdmin || isGestionnaire;
-  bool get canDoTransactions => isAdmin || isCaissier;
-  bool get canValidateCredits => isAdmin || isGestionnaire;
-  bool get canDebloquerCredits => isAdmin || isCaissier;
+  bool get canDoTransactions => isCaissier;
+  bool get canValidateCredits => isGestionnaire;
+  bool get canDebloquerCredits => isCaissier;
 
   Map<String, dynamic> toJson() => {
         'token': token,

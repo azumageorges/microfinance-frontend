@@ -31,7 +31,9 @@ class StatusBadge extends StatelessWidget {
     switch (status.toUpperCase()) {
       case 'ACTIF':
       case 'VALIDE':
+      case 'VALIDEE':
       case 'REMBOURSE':
+      case 'EXECUTEE':
         return _BadgeConfig(
           bg: AppTheme.success.withValues(alpha: 0.12),
           text: AppTheme.success,
@@ -79,7 +81,10 @@ class StatusBadge extends StatelessWidget {
       'EN_ATTENTE': 'En attente',
       'EN_COURS': 'En cours',
       'VALIDE': 'Validé',
+      'VALIDEE': 'Validée',
       'REJETE': 'Rejeté',
+      'REJETEE': 'Rejetée',
+      'EXECUTEE': 'Exécutée',
       'REMBOURSE': 'Remboursé',
       'EN_RETARD': 'En retard',
       'CONTENTIEUX': 'Contentieux',

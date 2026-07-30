@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../data/models/transaction_model.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/app_app_bar.dart';
+import '../../widgets/status_badge.dart';
 
 class TransactionsScreen extends ConsumerWidget {
   const TransactionsScreen({super.key});
@@ -14,7 +16,9 @@ class TransactionsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final txAsync = ref.watch(transactionsProvider);
     final auth = ref.watch(authProvider);
-    final canOperate = auth?.isAdmin == true || auth?.isCaissier == true;
+    final canCreate = auth?.isCaissier == true;
+    final canValidate = auth?.isGestionnaire == true;
+    final canExecute = auth?.isCaissier == true;
 
     return Scaffold(
       appBar: AppAppBar(
@@ -30,7 +34,7 @@ class TransactionsScreen extends ConsumerWidget {
       body: Column(
         children: [
           // Boutons d'opération
-          if (canOperate)
+          if (canCreate)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
@@ -94,83 +98,196 @@ class TransactionsScreen extends ConsumerWidget {
                       return Card(
                         child: Padding(
                           padding: const EdgeInsets.all(14),
-                          child: Row(
+                          child: Column(
                             children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: (tx.isCredit
-                                          ? AppTheme.success
-                                          : AppTheme.error)
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  tx.isCredit
-                                      ? Icons.arrow_downward
-                                      : Icons.arrow_upward,
-                                  color: tx.isCredit
-                                      ? AppTheme.success
-                                      : AppTheme.error,
-                                  size: 20,
-                                ),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: _amountColor(tx)
+                                          .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      _iconFor(tx),
+                                      color: _amountColor(tx),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                tx.typeLabel,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                            StatusBadge(
+                                              status: tx.statut,
+                                              label: tx.statutLabel,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          tx.nomClient ?? tx.numeroCompte,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                        Text(
+                                          tx.reference,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.textSecondary,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _detailLine(tx),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                        if (tx.motif != null &&
+                                            tx.motif!.trim().isNotEmpty)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
+                                            child: Text(
+                                              'Motif : ${tx.motif}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color:
+                                                    AppTheme.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        if (tx.motifRejet != null &&
+                                            tx.motifRejet!.trim().isNotEmpty)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
+                                            child: Text(
+                                              'Rejet : ${tx.motifRejet}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: AppTheme.error,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        Formatters.currency(tx.montant),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: _amountColor(tx),
+                                        ),
+                                      ),
+                                      Text(
+                                        Formatters.shortDate(
+                                            tx.dateExecution ??
+                                                tx.dateTransaction),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                              if (tx.isPendingValidation && canValidate) ...[
+                                const SizedBox(height: 12),
+                                Row(
                                   children: [
-                                    Text(
-                                      tx.typeLabel,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () =>
+                                            _validerOperation(
+                                          context,
+                                          ref,
+                                          tx,
+                                          false,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.close,
+                                          color: AppTheme.error,
+                                        ),
+                                        label: const Text(
+                                          'Rejeter',
+                                          style: TextStyle(
+                                            color: AppTheme.error,
+                                          ),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          side: const BorderSide(
+                                            color: AppTheme.error,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                    Text(
-                                      tx.nomClient ?? tx.numeroCompte,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                    Text(
-                                      tx.reference,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.textSecondary,
-                                        fontFamily: 'monospace',
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () =>
+                                            _validerOperation(
+                                          context,
+                                          ref,
+                                          tx,
+                                          true,
+                                        ),
+                                        icon: const Icon(Icons.check),
+                                        label: const Text('Valider'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              AppTheme.success,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    Formatters.currency(tx.montant),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: tx.isCredit
-                                          ? AppTheme.success
-                                          : AppTheme.error,
+                              ],
+                              if (tx.isValidated && canExecute) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _executerOperation(context, ref, tx),
+                                    icon: const Icon(Icons.payments_outlined),
+                                    label: Text(
+                                      tx.typeTransaction == 'RETRAIT'
+                                          ? 'Remettre les fonds'
+                                          : 'Exécuter le transfert',
                                     ),
                                   ),
-                                  Text(
-                                    Formatters.shortDate(
-                                        tx.dateTransaction),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -184,6 +301,190 @@ class TransactionsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _validerOperation(
+    BuildContext context,
+    WidgetRef ref,
+    TransactionModel tx,
+    bool approuve,
+  ) async {
+    String? motifRejet;
+    if (!approuve) {
+      motifRejet = await _demanderMotifRejet(context);
+      if ((motifRejet ?? '').trim().isEmpty || !context.mounted) return;
+    } else {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Valider cette opération ?'),
+          content: Text(
+            'Le ${tx.typeLabel.toLowerCase()} ${tx.reference} pourra ensuite être exécuté par le caissier.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.success,
+              ),
+              child: const Text('Valider'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !context.mounted) return;
+    }
+
+    try {
+      await ref.read(transactionRepositoryProvider).validerOperation(
+            tx.id,
+            approuve: approuve,
+            motifRejet: motifRejet,
+          );
+      ref.invalidate(transactionsProvider);
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(creditsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(approuve
+                ? 'Opération validée'
+                : 'Opération rejetée'),
+            backgroundColor:
+                approuve ? AppTheme.success : AppTheme.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _executerOperation(
+    BuildContext context,
+    WidgetRef ref,
+    TransactionModel tx,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmer l’exécution'),
+        content: Text(
+          tx.typeTransaction == 'RETRAIT'
+              ? 'Confirmez-vous la remise des fonds au client ?'
+              : 'Confirmez-vous l’exécution définitive du transfert ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Exécuter'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    try {
+      await ref.read(transactionRepositoryProvider).executerOperation(tx.id);
+      ref.invalidate(transactionsProvider);
+      ref.invalidate(comptesProvider);
+      ref.invalidate(dashboardProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opération exécutée avec succès'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _demanderMotifRejet(BuildContext context) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Motif du rejet'),
+        content: TextField(
+          controller: controller,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Expliquez pourquoi la demande est rejetée',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+            ),
+            child: const Text('Rejeter'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  String _detailLine(TransactionModel tx) {
+    final details = <String>[
+      tx.numeroCompte,
+      if (tx.numeroCompteDestination != null &&
+          tx.numeroCompteDestination!.isNotEmpty)
+        'vers ${tx.numeroCompteDestination}',
+      if (tx.initiePar != null && tx.initiePar!.isNotEmpty)
+        'initiée par ${tx.initiePar}',
+      if (tx.validePar != null && tx.validePar!.isNotEmpty)
+        'validée par ${tx.validePar}',
+    ];
+    return details.join(' • ');
+  }
+
+  Color _amountColor(TransactionModel tx) {
+    if (!tx.isExecuted && tx.isSensitive) {
+      return AppTheme.warning;
+    }
+    return tx.isCredit ? AppTheme.success : AppTheme.error;
+  }
+
+  IconData _iconFor(TransactionModel tx) {
+    return switch (tx.typeTransaction) {
+      'DEPOT' => Icons.arrow_downward,
+      'TRANSFERT' => Icons.swap_horiz,
+      'RETRAIT' => Icons.arrow_upward,
+      _ => tx.isCredit ? Icons.arrow_downward : Icons.arrow_upward,
+    };
   }
 }
 

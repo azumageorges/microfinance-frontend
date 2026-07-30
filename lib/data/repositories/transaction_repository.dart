@@ -101,4 +101,37 @@ class TransactionRepository {
       throw ApiException.fromDioError(e);
     }
   }
+
+  Future<TransactionModel> validerOperation(
+    int id, {
+    required bool approuve,
+    String? motifRejet,
+  }) async {
+    try {
+      final res = await _apiClient.dio.patch(
+        '/api/transactions/$id/valider',
+        data: {
+          'approuve': approuve,
+          if (motifRejet != null && motifRejet.trim().isNotEmpty)
+            'motifRejet': motifRejet.trim(),
+        },
+      );
+      return TransactionModel.fromJson(
+        res.data['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
+  Future<TransactionModel> executerOperation(int id) async {
+    try {
+      final res = await _apiClient.dio.patch('/api/transactions/$id/executer');
+      return TransactionModel.fromJson(
+        res.data['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
 }

@@ -255,9 +255,8 @@ class CreditDetailScreen extends ConsumerWidget {
   ) {
     final actions = <Widget>[];
 
-    // Valider (ADMIN / GESTIONNAIRE, EN_ATTENTE)
-    if (credit.statut == 'EN_ATTENTE' &&
-        (auth?.isAdmin == true || auth?.isGestionnaire == true)) {
+    // Valider (Gestionnaire, EN_ATTENTE)
+    if (credit.statut == 'EN_ATTENTE' && auth?.isGestionnaire == true) {
       actions.addAll([
         const SizedBox(height: 12),
         Row(
@@ -287,15 +286,14 @@ class CreditDetailScreen extends ConsumerWidget {
       ]);
     }
 
-    // Débloquer (ADMIN / CAISSIER, VALIDE)
-    if (credit.statut == 'VALIDE' &&
-        (auth?.isAdmin == true || auth?.isCaissier == true)) {
+    // Débloquer (Caissier, VALIDE)
+    if (credit.statut == 'VALIDE' && auth?.isCaissier == true) {
       actions.addAll([
         const SizedBox(height: 12),
         ElevatedButton.icon(
           onPressed: () => _debloquer(context, ref, credit.id),
           icon: const Icon(Icons.lock_open),
-          label: const Text('Débloquer le crédit'),
+                label: const Text('Décaisser les fonds'),
           style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary),
         ),
@@ -318,7 +316,7 @@ class CreditDetailScreen extends ConsumerWidget {
         title: Text(approuve ? 'Approuver le crédit ?' : 'Rejeter le crédit ?'),
         content: Text(approuve
             ? 'Le crédit sera validé et en attente de déblocage.'
-            : 'Le crédit sera définitivement rejeté.'),
+            : 'Le crédit sera rejeté et ne pourra pas être décaissé.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -366,9 +364,9 @@ class CreditDetailScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Débloquer le crédit ?'),
+        title: const Text('Décaisser ce crédit ?'),
         content: const Text(
-            'Les fonds seront versés sur le compte du client. Cette action est irréversible.'),
+            'Les fonds seront remis au client après validation préalable du gestionnaire. Cette action est irréversible.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -378,7 +376,7 @@ class CreditDetailScreen extends ConsumerWidget {
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary),
-            child: const Text('Débloquer'),
+            child: const Text('Décaisser'),
           ),
         ],
       ),
@@ -391,7 +389,7 @@ class CreditDetailScreen extends ConsumerWidget {
       ref.invalidate(_creditByReferenceProvider(reference));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Crédit débloqué'),
+          content: Text('Décaissement effectué'),
           backgroundColor: AppTheme.success,
         ));
       }
@@ -490,7 +488,7 @@ class _EcheancesCard extends StatelessWidget {
                 canPay: (credit.statut == 'EN_COURS' ||
                         credit.statut == 'EN_RETARD') &&
                     !e.paye &&
-                    (auth?.isAdmin == true || auth?.isCaissier == true),
+                    auth?.isCaissier == true,
               )),
         ],
       ),
