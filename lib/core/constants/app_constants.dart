@@ -12,11 +12,18 @@ class AppConstants {
       return _apiBaseUrlOverride;
     }
 
-    if (kIsWeb) {
-      return 'http://localhost:8081';
+    // Sécurité : en release, on ne veut pas "tomber" sur une URL locale silencieusement.
+    // Si `API_BASE_URL` n'est pas fourni au build, on force une erreur explicite
+    // (sinon l'appli paraît "cassée" sur téléphone réel).
+    if (kReleaseMode) {
+      throw StateError(
+        'API_BASE_URL manquant. Rebuild avec --dart-define=API_BASE_URL=https://...',
+      );
     }
 
-    // Android émulateur : 10.0.2.2 = localhost de la machine hôte.
+    if (kIsWeb) return 'http://localhost:8081';
+
+    // Android émulateur : 10.0.2.2 = localhost de la machine hôte (debug uniquement).
     return 'http://10.0.2.2:8081';
   }
 

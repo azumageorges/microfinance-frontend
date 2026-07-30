@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
+import 'retry_interceptor.dart';
 
 /// Callback appelé quand le token est expiré (401) pour déclencher le logout
 typedef OnUnauthorized = void Function();
@@ -18,14 +19,24 @@ class ApiClient {
       debugPrint('[API BASE URL] $baseUrl');
     }
 
+    // Sur Flutter Web, le "premier appel" peut subir un délai important
+    // (ex: cold start du backend). On tolère donc un connectTimeout plus long.
+    final connectTimeout = kIsWeb
+        ? const Duration(seconds: 45)
+        : const Duration(seconds: 15);
+    final receiveTimeout = kIsWeb
+        ? const Duration(seconds: 60)
+        : const Duration(seconds: 30);
+
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
       headers: {'Content-Type': 'application/json'},
     ));
 
     _dio.interceptors.add(_AuthInterceptor(this));
+    _dio.interceptors.add(RetryInterceptor(_dio));
     if (kDebugMode) _dio.interceptors.add(_LogInterceptor());
   }
 

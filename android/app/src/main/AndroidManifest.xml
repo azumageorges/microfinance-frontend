@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- IMPORTANT :
+         En build release (APK installé), c'est ce manifest "main" qui est utilisé.
+         Sans cette permission, toutes les requêtes HTTP(S) échouent sur téléphone réel. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="microfinance_app"
         android:name="${applicationName}"

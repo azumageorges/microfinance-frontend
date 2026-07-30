@@ -51,7 +51,9 @@ class ClientRepository {
 
   Future<ClientModel> updateClient(int id, Map<String, dynamic> data) async {
     try {
-      final res = await _apiClient.dio.put('/api/clients/$id', data: data);
+      // PATCH côté backend pour éviter d'écraser les champs non envoyés (null)
+      // quand on corrige seulement 1 ou 2 informations depuis le bureau.
+      final res = await _apiClient.dio.patch('/api/clients/$id', data: data);
       return ClientModel.fromJson(res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);

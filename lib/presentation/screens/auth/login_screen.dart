@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../providers/providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -18,6 +20,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _loading = false;
   bool _obscure = true;
   String? _error;
+
+  // Permet d'afficher l'URL réellement utilisée au runtime (même en release)
+  // quand on build avec : `--dart-define=SHOW_API_BASE_URL=true`.
+  static const bool _showApiBaseUrl =
+      bool.fromEnvironment('SHOW_API_BASE_URL', defaultValue: false);
+
+  @override
+  void initState() {
+    super.initState();
+    // Pré-chauffe le backend dès l'ouverture de l'écran de login afin
+    // d'éviter un timeout lors du tout premier login (cold start Render).
+    _warmupBackend();
+  }
+
+  Future<void> _warmupBackend() async {
+    try {
+      await ref.read(apiClientProvider).dio.get(
+            '/api/health',
+            options: Options(
+              // Tolérance plus longue pour le réveil du backend
+              sendTimeout: const Duration(seconds: 60),
+              receiveTimeout: const Duration(seconds: 60),
+            ),
+          );
+    } catch (_) {
+      // Silencieux : le but est juste de "réveiller" le backend si besoin.
+    }
+  }
 
   @override
   void dispose() {
@@ -45,6 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 700;
     final sessionExpiredMessage = ref.watch(sessionExpiredMessageProvider);
+    final baseUrl = AppConstants.baseUrl;
 
     return Scaffold(
       backgroundColor: AppTheme.surface,
@@ -91,6 +122,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: const TextStyle(
                       color: AppTheme.textSecondary, fontSize: 14),
                 ),
+                if (_showApiBaseUrl) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'API: $baseUrl',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 36),
 
                 // Bandeau info mobile
