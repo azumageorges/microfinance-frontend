@@ -79,6 +79,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (location.startsWith('/caisse') && !auth.isCaissier && !auth.isAdmin) {
         return auth.homeRoute;
       }
+      if (location.startsWith('/transactions') &&
+          !auth.canAccessTransactions) {
+        return auth.homeRoute;
+      }
       if (location.startsWith('/utilisateurs') &&
           !auth.canAccessUtilisateurs) {
         return auth.homeRoute;
@@ -192,7 +196,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          // Transactions (Caissier + Admin)
+          // Transactions (Admin + Gestionnaire + Caissier)
           GoRoute(
             path: '/transactions',
             builder: (ctx, state) => const TransactionsScreen(),

@@ -175,9 +175,26 @@ class _UserCard extends StatelessWidget {
                       );
                     }
                   }
+                } else if (action == 'modifier') {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => _EditUserSheet(user: user, ref: ref),
+                  );
                 }
               },
               itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'modifier',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('Modifier'),
+                    ],
+                  ),
+                ),
                 PopupMenuItem(
                   value: 'toggle',
                   child: Row(
@@ -398,6 +415,227 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
                         ),
                       )
                     : const Text('Créer l\'utilisateur'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Sheet modification utilisateur ──────────────────────────────────────────
+
+class _EditUserSheet extends ConsumerStatefulWidget {
+  final UtilisateurModel user;
+  final WidgetRef ref;
+
+  const _EditUserSheet({required this.user, required this.ref});
+
+  @override
+  ConsumerState<_EditUserSheet> createState() => _EditUserSheetState();
+}
+
+class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nomCtrl;
+  late final TextEditingController _prenomCtrl;
+  late final TextEditingController _telCtrl;
+  late String _role;
+  bool _loading = false;
+  String? _error;
+
+  static const _roles = {
+    'ADMIN':               'Administrateur',
+    'AGENT_TERRAIN':       'Agent terrain',
+    'GESTIONNAIRE_COMPTE': 'Gestionnaire de compte',
+    'CAISSIER':            'Caissier',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _nomCtrl    = TextEditingController(text: widget.user.nom);
+    _prenomCtrl = TextEditingController(text: widget.user.prenom);
+    _telCtrl    = TextEditingController(text: widget.user.telephone ?? '');
+    _role       = widget.user.role;
+  }
+
+  @override
+  void dispose() {
+    _nomCtrl.dispose();
+    _prenomCtrl.dispose();
+    _telCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
+
+    try {
+      await ref.read(utilisateurRepositoryProvider).updateUtilisateur(
+        widget.user.id,
+        {
+          if (_nomCtrl.text.trim() != widget.user.nom)
+            'nom': _nomCtrl.text.trim(),
+          if (_prenomCtrl.text.trim() != widget.user.prenom)
+            'prenom': _prenomCtrl.text.trim(),
+          if (_telCtrl.text.trim() != (widget.user.telephone ?? ''))
+            'telephone': _telCtrl.text.trim(),
+          if (_role != widget.user.role)
+            'role': _role,
+        },
+      );
+      ref.invalidate(utilisateursProvider);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Utilisateur modifié avec succès'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // En-tête
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppTheme.primaryLight,
+                    child: Text(
+                      widget.user.fullName.isNotEmpty
+                          ? widget.user.fullName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Modifier l\'utilisateur',
+                            style: TextStyle(
+                                fontSize: 17, fontWeight: FontWeight.w700)),
+                        Text(widget.user.email,
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Prénom + Nom
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _prenomCtrl,
+                      decoration: const InputDecoration(labelText: 'Prénom'),
+                      validator: (v) =>
+                          v?.trim().isEmpty == true ? 'Requis' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _nomCtrl,
+                      decoration: const InputDecoration(labelText: 'Nom'),
+                      validator: (v) =>
+                          v?.trim().isEmpty == true ? 'Requis' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Téléphone
+              TextFormField(
+                controller: _telCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Téléphone',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Rôle
+              DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
+                value: _role,
+                decoration: const InputDecoration(labelText: 'Rôle'),
+                items: _roles.entries
+                    .map((e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _role = v!),
+              ),
+
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppTheme.error.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline,
+                          color: AppTheme.error, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(_error!,
+                            style:
+                                const TextStyle(color: AppTheme.error, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+
+              ElevatedButton(
+                onPressed: _loading ? null : _submit,
+                child: _loading
+                    ? const SizedBox(
+                        height: 20, width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Enregistrer les modifications'),
               ),
             ],
           ),

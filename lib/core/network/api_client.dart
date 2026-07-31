@@ -1,10 +1,10 @@
-import 'package:dio/dio.dart';
+﻿import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 import 'retry_interceptor.dart';
 
-/// Callback appelé quand le token est expiré (401) pour déclencher le logout
+/// Callback appelÃƒÆ’Ã‚Â© quand le token est expirÃƒÆ’Ã‚Â© (401) pour dÃƒÆ’Ã‚Â©clencher le logout
 typedef OnUnauthorized = void Function();
 
 class ApiClient {
@@ -12,15 +12,15 @@ class ApiClient {
   OnUnauthorized? onUnauthorized;
 
   ApiClient() {
-    // URL du backend selon la plateforme, avec possibilité de surcharge
+    // URL du backend selon la plateforme, avec possibilitÃƒÆ’Ã‚Â© de surcharge
     // via `--dart-define=API_BASE_URL=...`.
     final baseUrl = AppConstants.baseUrl;
     if (kDebugMode) {
       debugPrint('[API BASE URL] $baseUrl');
     }
 
-    // Sur Flutter Web, le "premier appel" peut subir un délai important
-    // (ex: cold start du backend). On tolère donc un connectTimeout plus long.
+    // Sur Flutter Web, le "premier appel" peut subir un dÃƒÆ’Ã‚Â©lai important
+    // (ex: cold start du backend). On tolÃƒÆ’Ã‚Â¨re donc un connectTimeout plus long.
     final connectTimeout = kIsWeb
         ? const Duration(seconds: 45)
         : const Duration(seconds: 15);
@@ -43,8 +43,8 @@ class ApiClient {
   Dio get dio => _dio;
 }
 
-/// Injecte automatiquement le JWT dans chaque requête
-/// et gère la déconnexion automatique sur 401
+/// Injecte automatiquement le JWT dans chaque requÃƒÆ’Ã‚Âªte
+/// et gÃƒÆ’Ã‚Â¨re la dÃƒÆ’Ã‚Â©connexion automatique sur 401
 class _AuthInterceptor extends Interceptor {
   final ApiClient _client;
 
@@ -57,7 +57,7 @@ class _AuthInterceptor extends Interceptor {
   ) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(AppConstants.tokenKey);
-    if (token != null) {
+    if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     if (kDebugMode) {
@@ -70,7 +70,7 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // Token expiré ou invalide → déclencher le logout
+    // Token expirÃƒÆ’Ã‚Â© ou invalide ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ dÃƒÆ’Ã‚Â©clencher le logout
     final statusCode = err.response?.statusCode;
     final path = err.requestOptions.path;
     final isAuthEndpoint = path.startsWith('/api/auth/');
@@ -85,19 +85,22 @@ class _AuthInterceptor extends Interceptor {
 class _LogInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    debugPrint('[API ▶] ${options.method} ${options.path}');
+    debugPrint('[API ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶] ${options.method} ${options.path}');
     handler.next(options);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    debugPrint('[API ✓] ${response.statusCode} ${response.requestOptions.path}');
+    debugPrint('[API ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“] ${response.statusCode} ${response.requestOptions.path}');
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    debugPrint('[API ✗] ${err.response?.statusCode} ${err.message}');
+    debugPrint('[API ÃƒÂ¢Ã…â€œÃ¢â‚¬â€] ${err.response?.statusCode} ${err.message}');
     handler.next(err);
   }
 }
+
+
+

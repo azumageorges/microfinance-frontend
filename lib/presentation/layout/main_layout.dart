@@ -41,7 +41,7 @@ class MainLayout extends ConsumerWidget {
         activeIcon: Icons.swap_horiz,
         label: 'Transactions',
         path: '/transactions',
-        roles: ['ADMIN', 'CAISSIER']),
+        roles: ['ADMIN', 'GESTIONNAIRE_COMPTE', 'CAISSIER']),
     _NavItem(
         icon: Icons.credit_score_outlined,
         activeIcon: Icons.credit_score,

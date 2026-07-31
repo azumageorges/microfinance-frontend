@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../data/models/transaction_model.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/loading_overlay.dart';
@@ -234,7 +235,7 @@ class _StatsGrid extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  final dynamic tx;
+  final TransactionModel tx;
   const _TransactionTile({required this.tx});
 
   @override
@@ -255,11 +256,7 @@ class _TransactionTile extends StatelessWidget {
           color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(
-          icon,
-          color: color,
-          size: 18,
-        ),
+        child: Icon(icon, color: color, size: 18),
       ),
       title: Text(
         '${tx.typeLabel} • ${tx.statutLabel}',
@@ -283,7 +280,8 @@ class _TransactionTile extends StatelessWidget {
           ),
           Text(
             Formatters.timeAgo(tx.dateTransaction),
-            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+            style: const TextStyle(
+                fontSize: 11, color: AppTheme.textSecondary),
           ),
         ],
       ),

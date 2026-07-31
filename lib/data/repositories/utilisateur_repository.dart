@@ -42,6 +42,22 @@ class UtilisateurRepository {
     }
   }
 
+  Future<UtilisateurModel> updateUtilisateur(
+    int id,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final res = await _apiClient.dio.patch(
+        '/api/utilisateurs/$id',
+        data: data,
+      );
+      return UtilisateurModel.fromJson(
+          res.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
   Future<void> changerMotDePasse(
     int id, {
     required String ancien,

@@ -51,6 +51,7 @@ class AuthResponse {
   bool get canAccessDashboard => isAdmin || isGestionnaire;
   bool get canAccessUtilisateurs => isAdmin;
   bool get canManageComptes => isAdmin || isGestionnaire;
+  bool get canAccessTransactions => isAdmin || isGestionnaire || isCaissier;
   bool get canDoTransactions => isCaissier;
   bool get canValidateCredits => isGestionnaire;
   bool get canDebloquerCredits => isCaissier;
