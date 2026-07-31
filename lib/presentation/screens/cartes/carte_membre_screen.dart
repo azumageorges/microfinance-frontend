@@ -91,6 +91,7 @@ class _CarteMembreState extends ConsumerState<CarteMembre> {
     try {
       await ref.read(carteRepositoryProvider).genererCarte(widget.clientId);
       ref.invalidate(_carteProvider(widget.clientId));
+      ref.invalidate(clientsProvider); // ← rafraîchit le numeroMembre dans la liste
       if (mounted) _showSuccess('Carte émise avec succès ✓');
     } catch (e) {
       if (mounted) _showError(e.toString());
