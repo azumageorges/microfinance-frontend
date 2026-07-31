@@ -79,7 +79,7 @@ class _NetworkAvatarState extends State<_NetworkAvatar> {
   void didUpdateWidget(_NetworkAvatar old) {
     super.didUpdateWidget(old);
     if (old.photoUrl != widget.photoUrl) {
-      setState(() => _hasError = false);
+      _hasError = false;
       _loadImage();
     }
   }
@@ -89,9 +89,15 @@ class _NetworkAvatarState extends State<_NetworkAvatar> {
     final stream = _provider.resolve(ImageConfiguration.empty);
     stream.addListener(
       ImageStreamListener(
-        (ImageInfo info, bool sync) {},
+        (ImageInfo info, bool sync) {
+          if (mounted && _hasError) {
+            setState(() => _hasError = false);
+          }
+        },
         onError: (Object e, StackTrace? s) {
-          if (mounted) setState(() => _hasError = true);
+          if (mounted && !_hasError) {
+            setState(() => _hasError = true);
+          }
         },
       ),
     );
