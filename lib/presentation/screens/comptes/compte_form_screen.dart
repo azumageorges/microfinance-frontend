@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../data/models/client_model.dart';
 import '../../../providers/providers.dart';
 
@@ -49,7 +50,10 @@ class _CompteFormScreenState extends ConsumerState<CompteFormScreen> {
       final client =
           await ref.read(clientRepositoryProvider).getClientById(id);
       if (mounted) setState(() => _clientSelectionne = client);
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      AppLogger.error('Chargement du client $id échoué', e, stackTrace);
+      if (mounted) setState(() => _error = e.toString());
+    }
   }
 
   @override

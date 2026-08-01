@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/carte_theme.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/carte_pdf_service.dart';
 import '../../../data/models/carte_model.dart';
 import '../../../data/models/client_model.dart';
@@ -489,7 +490,12 @@ class _PreviewView extends StatelessWidget {
   }
 
   static Uint8List? _decodeBase64(String b64) {
-    try { return base64Decode(b64); } catch (_) { return null; }
+    try {
+      return base64Decode(b64);
+    } catch (e, stackTrace) {
+      AppLogger.warning('QR code base64 illisible', e, stackTrace);
+      return null;
+    }
   }
 }
 

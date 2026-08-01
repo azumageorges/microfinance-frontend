@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-
 import '../../data/local/client_local_store.dart';
 import '../../data/local/compte_local_store.dart';
 import '../../data/local/credit_local_store.dart';
@@ -14,6 +12,7 @@ import '../../data/models/credit_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../network/api_client.dart';
 import '../network/connectivity_service.dart';
+import '../utils/app_logger.dart';
 
 typedef SyncCompletedCallback = void Function();
 
@@ -99,8 +98,12 @@ class SyncService {
             default:
               break;
           }
-        } catch (e) {
-          debugPrint('Sync failed for queue item ${item.id} (${item.entityType}): $e');
+        } catch (e, stackTrace) {
+          AppLogger.error(
+            'Sync failed for queue item ${item.id} (${item.entityType})',
+            e,
+            stackTrace,
+          );
           await _syncQueue.incrementRetry(item.id);
         }
       }
@@ -195,8 +198,8 @@ class SyncService {
           .map((e) => ClientModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _clientStore.upsertAll(clients);
-    } catch (e) {
-      debugPrint('Pull clients failed: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Pull clients failed', e, stackTrace);
     }
   }
 
@@ -209,8 +212,8 @@ class SyncService {
           .map((e) => CompteModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _compteStore.upsertAll(comptes);
-    } catch (e) {
-      debugPrint('Pull comptes failed: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Pull comptes failed', e, stackTrace);
     }
   }
 
@@ -223,8 +226,8 @@ class SyncService {
           .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _transactionStore.upsertAll(txs);
-    } catch (e) {
-      debugPrint('Pull transactions failed: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Pull transactions failed', e, stackTrace);
     }
   }
 
@@ -237,8 +240,8 @@ class SyncService {
           .map((e) => CreditModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _creditStore.upsertAll(credits);
-    } catch (e) {
-      debugPrint('Pull credits failed: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Pull credits failed', e, stackTrace);
     }
   }
 }

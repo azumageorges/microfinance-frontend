@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/app_logger.dart';
 import '../models/auth_model.dart';
 
 class AuthRepository {
@@ -28,6 +29,8 @@ class AuthRepository {
       return auth;
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -65,8 +68,13 @@ class AuthRepository {
           options: Options(headers: {'Authorization': 'Bearer $token'}),
         );
       }
-    } catch (_) {
+    } catch (e, stackTrace) {
       // Echec réseau toléré — on nettoie quand même localement
+      AppLogger.warning(
+        'Révocation du token côté serveur échouée',
+        e,
+        stackTrace,
+      );
     }
     // 2. Supprimer les données locales
     await clearLocalSession();

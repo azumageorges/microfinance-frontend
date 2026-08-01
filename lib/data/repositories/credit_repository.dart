@@ -25,6 +25,8 @@ class CreditRepository {
       return credit;
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -39,9 +41,11 @@ class CreditRepository {
             .toList();
         await _localStore?.upsertAll(remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -56,6 +60,8 @@ class CreditRepository {
           .toList();
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -70,9 +76,11 @@ class CreditRepository {
             .toList();
         await _localStore?.upsertAll(remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -88,6 +96,8 @@ class CreditRepository {
       return credit;
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -107,6 +117,8 @@ class CreditRepository {
       return CreditModel.fromJson(res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -117,6 +129,8 @@ class CreditRepository {
       return CreditModel.fromJson(res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -127,6 +141,8 @@ class CreditRepository {
       return CreditModel.fromJson(res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 }
