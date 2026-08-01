@@ -9,6 +9,7 @@ import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/app_app_bar.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 // ─── Écran liste des crédits ──────────────────────────────────────────────────
 
@@ -399,12 +400,7 @@ class _DemandeCreditSheetState extends ConsumerState<_DemandeCreditSheet> {
       ref.invalidate(creditsProvider);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Demande de crédit soumise ✓'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        context.showSuccessSnackBar('Demande de crédit soumise ✓');
       }
     } catch (e) {
       setState(() => _error = e.toString());
@@ -531,9 +527,7 @@ class _StepCompteState extends ConsumerState<_StepCompte> {
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Erreur : $e'),
-            backgroundColor: AppTheme.error));
+        context.showErrorSnackBar('Erreur : $e');
       }
     } finally {
       if (mounted) setState(() => _creating = false);

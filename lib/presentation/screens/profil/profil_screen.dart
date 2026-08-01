@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/providers.dart';
+import '../../../core/utils/app_dialogs.dart';
 
 class ProfilScreen extends ConsumerWidget {
   const ProfilScreen({super.key});
@@ -147,27 +148,14 @@ class ProfilScreen extends ConsumerWidget {
                           color: AppTheme.error)),
                   subtitle: const Text('Quitter l\'application'),
                   onTap: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Déconnexion'),
-                        content: const Text(
-                            'Voulez-vous vraiment vous déconnecter ?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Annuler'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.error),
-                            child: const Text('Déconnecter'),
-                          ),
-                        ],
-                      ),
+                    final confirm = await AppDialogs.confirm(
+                      context,
+                      title: 'Déconnexion',
+                      message: 'Voulez-vous vraiment vous déconnecter ?',
+                      confirmLabel: 'Déconnecter',
+                      confirmColor: AppTheme.error,
                     );
-                    if (confirm == true) {
+                    if (confirm) {
                       await ref.read(authProvider.notifier).logout();
                     }
                   },

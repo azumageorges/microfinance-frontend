@@ -7,6 +7,7 @@ import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/app_app_bar.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class CompteDetailScreen extends ConsumerWidget {
   final String numeroCompte;
@@ -272,21 +273,11 @@ class CompteDetailScreen extends ConsumerWidget {
       }
       ref.invalidate(comptesProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Opération effectuée'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        context.showSuccessSnackBar('Opération effectuée');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        context.showErrorSnackBar(e.toString());
       }
     }
   }

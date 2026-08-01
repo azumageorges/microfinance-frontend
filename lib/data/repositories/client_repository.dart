@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/network/api_request.dart';
 import '../../core/network/connectivity_service.dart';
 import '../../core/sync/sync_service.dart';
 import '../local/client_local_store.dart';
@@ -33,10 +34,10 @@ class ClientRepository {
 
     if (await _connectivity.isOnline()) {
       try {
-        final res = await _apiClient.dio.get('/api/clients');
-        final remote = (res.data['data'] as List)
-            .map((e) => ClientModel.fromJson(e as Map<String, dynamic>))
-            .toList();
+        final remote = parseList(
+          await _apiClient.dio.get('/api/clients'),
+          ClientModel.fromJson,
+        );
         await _localStore.upsertAll(remote);
         await _syncService?.syncPendingChanges();
         return _mergeWithPending(await _localStore.getAll(), remote);
@@ -62,9 +63,10 @@ class ClientRepository {
 
     if (await _connectivity.isOnline()) {
       try {
-        final res = await _apiClient.dio.get('/api/clients/$id');
-        final remote =
-            ClientModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        final remote = parseItem(
+          await _apiClient.dio.get('/api/clients/$id'),
+          ClientModel.fromJson,
+        );
         await _localStore.upsert(remote);
         return remote;
       } on DioException catch (e) {
@@ -82,11 +84,11 @@ class ClientRepository {
 
     if (await _connectivity.isOnline()) {
       try {
-        final res = await _apiClient.dio
-            .get('/api/clients/recherche', queryParameters: {'q': query});
-        final remote = (res.data['data'] as List)
-            .map((e) => ClientModel.fromJson(e as Map<String, dynamic>))
-            .toList();
+        final remote = parseList(
+          await _apiClient.dio
+              .get('/api/clients/recherche', queryParameters: {'q': query}),
+          ClientModel.fromJson,
+        );
         await _localStore.upsertAll(remote);
         return remote;
       } on DioException {
@@ -99,15 +101,14 @@ class ClientRepository {
 
   Future<ClientModel> createClient(Map<String, dynamic> data) async {
     if (await _connectivity.isOnline()) {
-      try {
-        final res = await _apiClient.dio.post('/api/clients', data: data);
-        final client =
-            ClientModel.fromJson(res.data['data'] as Map<String, dynamic>);
+      return guardApi(() async {
+        final client = parseItem(
+          await _apiClient.dio.post('/api/clients', data: data),
+          ClientModel.fromJson,
+        );
         await _localStore.upsert(client);
         return client;
-      } on DioException catch (e) {
-        throw ApiException.fromDioError(e);
-      }
+      });
     }
 
     return _createClientOffline(data);
@@ -150,15 +151,14 @@ class ClientRepository {
 
   Future<ClientModel> updateClient(int id, Map<String, dynamic> data) async {
     if (await _connectivity.isOnline() && id > 0) {
-      try {
-        final res = await _apiClient.dio.patch('/api/clients/$id', data: data);
-        final client =
-            ClientModel.fromJson(res.data['data'] as Map<String, dynamic>);
+      return guardApi(() async {
+        final client = parseItem(
+          await _apiClient.dio.patch('/api/clients/$id', data: data),
+          ClientModel.fromJson,
+        );
         await _localStore.upsert(client);
         return client;
-      } on DioException catch (e) {
-        throw ApiException.fromDioError(e);
-      }
+      });
     }
 
     return _updateClientOffline(id, data);
@@ -170,30 +170,19 @@ class ClientRepository {
       throw ApiException('Client introuvable en mode hors ligne.');
     }
 
-    final updated = ClientModel(
-      id: existing.id,
-      numeroClient: existing.numeroClient,
-      nom: data['nom'] as String? ?? existing.nom,
-      prenom: data['prenom'] as String? ?? existing.prenom,
+    final updated = existing.copyWith(
+      nom: data['nom'] as String?,
+      prenom: data['prenom'] as String?,
       dateNaissance: data['dateNaissance'] != null
           ? DateTime.tryParse(data['dateNaissance'].toString())
-          : existing.dateNaissance,
-      lieuNaissance: data['lieuNaissance'] as String? ?? existing.lieuNaissance,
-      telephone: data['telephone'] as String? ?? existing.telephone,
-      email: data['email'] as String? ?? existing.email,
-      adresse: data['adresse'] as String? ?? existing.adresse,
-      profession: data['profession'] as String? ?? existing.profession,
-      typePieceIdentite:
-          data['typePieceIdentite'] as String? ?? existing.typePieceIdentite,
-      numeroPieceIdentite: data['numeroPieceIdentite'] as String? ??
-          existing.numeroPieceIdentite,
-      dateExpirationPiece: existing.dateExpirationPiece,
-      cheminPhoto: existing.cheminPhoto,
-      numeroMembre: existing.numeroMembre,
-      statut: existing.statut,
-      createdAt: existing.createdAt,
-      beneficiaires: existing.beneficiaires,
-      nombreComptes: existing.nombreComptes,
+          : null,
+      lieuNaissance: data['lieuNaissance'] as String?,
+      telephone: data['telephone'] as String?,
+      email: data['email'] as String?,
+      adresse: data['adresse'] as String?,
+      profession: data['profession'] as String?,
+      typePieceIdentite: data['typePieceIdentite'] as String?,
+      numeroPieceIdentite: data['numeroPieceIdentite'] as String?,
     );
 
     if (id < 0) {
@@ -223,45 +212,24 @@ class ClientRepository {
 
   Future<ClientModel> updateStatut(int id, String statut) async {
     if (await _connectivity.isOnline() && id > 0) {
-      try {
-        final res = await _apiClient.dio.patch(
-          '/api/clients/$id/statut',
-          queryParameters: {'statut': statut},
+      return guardApi(() async {
+        final client = parseItem(
+          await _apiClient.dio.patch(
+            '/api/clients/$id/statut',
+            queryParameters: {'statut': statut},
+          ),
+          ClientModel.fromJson,
         );
-        final client =
-            ClientModel.fromJson(res.data['data'] as Map<String, dynamic>);
         await _localStore.upsert(client);
         return client;
-      } on DioException catch (e) {
-        throw ApiException.fromDioError(e);
-      }
+      });
     }
 
     final existing = await _localStore.getById(id);
     if (existing == null) {
       throw ApiException('Client introuvable en mode hors ligne.');
     }
-    final updated = ClientModel(
-      id: existing.id,
-      numeroClient: existing.numeroClient,
-      nom: existing.nom,
-      prenom: existing.prenom,
-      dateNaissance: existing.dateNaissance,
-      lieuNaissance: existing.lieuNaissance,
-      telephone: existing.telephone,
-      email: existing.email,
-      adresse: existing.adresse,
-      profession: existing.profession,
-      typePieceIdentite: existing.typePieceIdentite,
-      numeroPieceIdentite: existing.numeroPieceIdentite,
-      dateExpirationPiece: existing.dateExpirationPiece,
-      cheminPhoto: existing.cheminPhoto,
-      numeroMembre: existing.numeroMembre,
-      statut: statut,
-      createdAt: existing.createdAt,
-      beneficiaires: existing.beneficiaires,
-      nombreComptes: existing.nombreComptes,
-    );
+    final updated = existing.copyWith(statut: statut);
     await _localStore.savePendingUpdate(updated);
     return updated;
   }

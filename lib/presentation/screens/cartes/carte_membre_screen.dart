@@ -14,6 +14,7 @@ import '../../../data/repositories/carte_repository.dart';
 import '../../../data/repositories/fichier_repository.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
+import '../../../core/utils/app_dialogs.dart';
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
@@ -102,29 +103,15 @@ class _CarteMembreState extends ConsumerState<CarteMembre> {
 
   /// Demande confirmation avant de régénérer une carte déjà émise.
   Future<void> _confirmerEtRegenerer() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Régénérer la carte ?'),
-        content: const Text(
-          'Le QR code sera recréé. Le numéro de membre et '
+    final ok = await AppDialogs.confirm(
+      context,
+      title: 'Régénérer la carte ?',
+      message: 'Le QR code sera recréé. Le numéro de membre et '
           'les dates d\'expiration restent inchangés.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary),
-            child: const Text('Régénérer'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Régénérer',
+      confirmColor: AppTheme.primary,
     );
-    if (ok == true) _emettreCarteAction();
+    if (ok) _emettreCarteAction();
   }
 
   Future<void> _changerPhoto() async {

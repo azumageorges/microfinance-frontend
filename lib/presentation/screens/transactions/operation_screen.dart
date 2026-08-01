@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/app_app_bar.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class OperationScreen extends ConsumerStatefulWidget {
   final String type; // 'depot' | 'retrait' | 'transfert'
@@ -101,12 +102,7 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
           'transfert' => 'Demande de transfert envoyée au gestionnaire',
           _ => 'Opération enregistrée',
         };
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(successMessage),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        context.showSuccessSnackBar(successMessage);
         context.pop();
       }
     } catch (e) {

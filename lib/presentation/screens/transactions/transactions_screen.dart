@@ -8,6 +8,8 @@ import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/app_app_bar.dart';
 import '../../widgets/status_badge.dart';
+import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/app_dialogs.dart';
 
 class TransactionsScreen extends ConsumerWidget {
   const TransactionsScreen({super.key});
@@ -314,29 +316,15 @@ class TransactionsScreen extends ConsumerWidget {
       motifRejet = await _demanderMotifRejet(context);
       if ((motifRejet ?? '').trim().isEmpty || !context.mounted) return;
     } else {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Valider cette opération ?'),
-          content: Text(
+      final ok = await AppDialogs.confirm(
+        context,
+        title: 'Valider cette opération ?',
+        message:
             'Le ${tx.typeLabel.toLowerCase()} ${tx.reference} pourra ensuite être exécuté par le caissier.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
-              ),
-              child: const Text('Valider'),
-            ),
-          ],
-        ),
+        confirmLabel: 'Valider',
+        confirmColor: AppTheme.success,
       );
-      if (ok != true || !context.mounted) return;
+      if (!ok || !context.mounted) return;
     }
 
     try {
@@ -349,24 +337,13 @@ class TransactionsScreen extends ConsumerWidget {
       ref.invalidate(dashboardProvider);
       ref.invalidate(creditsProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(approuve
+        context.showSnackBarWithColor(approuve
                 ? 'Opération validée'
-                : 'Opération rejetée'),
-            backgroundColor:
-                approuve ? AppTheme.success : AppTheme.error,
-          ),
-        );
+                : 'Opération rejetée', approuve ? AppTheme.success : AppTheme.error);
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        context.showErrorSnackBar(e.toString());
       }
     }
   }
@@ -376,28 +353,15 @@ class TransactionsScreen extends ConsumerWidget {
     WidgetRef ref,
     TransactionModel tx,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer l’exécution'),
-        content: Text(
-          tx.typeTransaction == 'RETRAIT'
-              ? 'Confirmez-vous la remise des fonds au client ?'
-              : 'Confirmez-vous l’exécution définitive du transfert ?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Exécuter'),
-          ),
-        ],
-      ),
+    final ok = await AppDialogs.confirm(
+      context,
+      title: 'Confirmer l’exécution',
+      message: tx.typeTransaction == 'RETRAIT'
+          ? 'Confirmez-vous la remise des fonds au client ?'
+          : 'Confirmez-vous l’exécution définitive du transfert ?',
+      confirmLabel: 'Exécuter',
     );
-    if (ok != true || !context.mounted) return;
+    if (!ok || !context.mounted) return;
 
     try {
       await ref.read(transactionRepositoryProvider).executerOperation(tx.id);
@@ -405,56 +369,24 @@ class TransactionsScreen extends ConsumerWidget {
       ref.invalidate(comptesProvider);
       ref.invalidate(dashboardProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Opération exécutée avec succès'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        context.showSuccessSnackBar('Opération exécutée avec succès');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        context.showErrorSnackBar(e.toString());
       }
     }
   }
 
-  Future<String?> _demanderMotifRejet(BuildContext context) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Motif du rejet'),
-        content: TextField(
-          controller: controller,
-          minLines: 2,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Expliquez pourquoi la demande est rejetée',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.error,
-            ),
-            child: const Text('Rejeter'),
-          ),
-        ],
-      ),
+  Future<String?> _demanderMotifRejet(BuildContext context) {
+    return AppDialogs.prompt(
+      context,
+      title: 'Motif du rejet',
+      hint: 'Expliquez pourquoi la demande est rejetée',
+      confirmLabel: 'Rejeter',
+      confirmColor: AppTheme.error,
+      maxLines: 4,
     );
-    controller.dispose();
-    return result;
   }
 
   String _detailLine(TransactionModel tx) {

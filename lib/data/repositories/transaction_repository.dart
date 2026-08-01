@@ -1,13 +1,12 @@
-import 'package:dio/dio.dart';
-
 import '../../core/network/api_client.dart';
-import '../../core/network/api_exception.dart';
+import '../../core/network/api_request.dart';
 import '../../core/network/connectivity_service.dart';
 import '../local/compte_local_store.dart';
 import '../local/sync_queue_store.dart';
 import '../local/sync_status.dart';
 import '../local/transaction_local_store.dart';
 import '../models/transaction_model.dart';
+import 'offline_first.dart';
 
 class TransactionRepository {
   final ApiClient _apiClient;
@@ -28,170 +27,126 @@ class TransactionRepository {
         _connectivity = connectivity;
 
   /// Toutes les transactions sans pagination — pour rapports et dashboard caissier/agent
-  Future<List<TransactionModel>> getAllTransactions() async {
-    final local = await _localStore?.getAll() ?? [];
-
-    if (_connectivity != null && await _connectivity.isOnline()) {
-      try {
-        final res = await _apiClient.dio.get('/api/transactions/all');
-        final remote = (res.data['data'] as List)
-            .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        await _localStore?.upsertAll(remote);
-        return remote;
-      } on DioException {
-        if (local.isNotEmpty) return local;
-        rethrow;
-      }
-    }
-
-    if (local.isNotEmpty) return local;
-    return local;
+  Future<List<TransactionModel>> getAllTransactions() {
+    return _offlineFirst(
+      local: () async => await _localStore?.getAll() ?? [],
+      remote: () async => parseList(
+        await _apiClient.dio.get('/api/transactions/all'),
+        TransactionModel.fromJson,
+      ),
+    );
   }
 
   Future<List<TransactionModel>> getTransactions({
     int page = 0,
     int size = 20,
-  }) async {
-    final local = await _localStore?.getAll() ?? [];
-
-    if (_connectivity != null && await _connectivity.isOnline()) {
-      try {
-        final res = await _apiClient.dio.get(
+  }) {
+    return _offlineFirst(
+      local: () async => await _localStore?.getAll() ?? [],
+      remote: () async => parsePage(
+        await _apiClient.dio.get(
           '/api/transactions',
           queryParameters: {'page': page, 'size': size},
-        );
-        final pageData = res.data['data'] as Map<String, dynamic>;
-        final remote = (pageData['content'] as List)
-            .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        await _localStore?.upsertAll(remote);
-        return remote;
-      } on DioException {
-        if (local.isNotEmpty) return local;
-        rethrow;
-      }
-    }
-
-    return local;
+        ),
+        TransactionModel.fromJson,
+      ),
+    );
   }
 
   Future<List<TransactionModel>> getTransactionsByCompte(
     String numeroCompte, {
     int page = 0,
     int size = 20,
-  }) async {
-    final local = await _localStore?.getByCompte(numeroCompte) ?? [];
-
-    if (_connectivity != null && await _connectivity.isOnline()) {
-      try {
-        final res = await _apiClient.dio.get(
+  }) {
+    return _offlineFirst(
+      local: () async => await _localStore?.getByCompte(numeroCompte) ?? [],
+      remote: () async => parsePage(
+        await _apiClient.dio.get(
           '/api/transactions/compte/$numeroCompte',
           queryParameters: {'page': page, 'size': size},
+        ),
+        TransactionModel.fromJson,
+      ),
+    );
+  }
+
+  Future<List<TransactionModel>> getTransactionsByClient(int clientId) {
+    return _offlineFirst(
+      local: () async => await _localStore?.getByClient(clientId) ?? [],
+      remote: () async => parseList(
+        await _apiClient.dio.get('/api/transactions/client/$clientId'),
+        TransactionModel.fromJson,
+      ),
+    );
+  }
+
+  Future<List<TransactionModel>> _offlineFirst({
+    required Future<List<TransactionModel>> Function() local,
+    required Future<List<TransactionModel>> Function() remote,
+  }) {
+    return offlineFirstList<TransactionModel>(
+      connectivity: _connectivity,
+      local: local,
+      remote: remote,
+      cache: (txs) async => _localStore?.upsertAll(txs),
+    );
+  }
+
+  Future<TransactionModel> depot(Map<String, dynamic> data) => _operation(
+        path: '/api/transactions/depot',
+        type: 'DEPOT',
+        operation: SyncOperation.depot,
+        data: data,
+        soldeSign: 1,
+      );
+
+  Future<TransactionModel> retrait(Map<String, dynamic> data) => _operation(
+        path: '/api/transactions/retrait',
+        type: 'RETRAIT',
+        operation: SyncOperation.retrait,
+        data: data,
+        soldeSign: -1,
+      );
+
+  Future<TransactionModel> transfert(Map<String, dynamic> data) => _operation(
+        path: '/api/transactions/transfert',
+        type: 'TRANSFERT',
+        operation: SyncOperation.transfert,
+        data: data,
+      );
+
+  /// Exécute l'opération en ligne (avec mise à jour du solde local quand
+  /// [soldeSign] est fourni) ou la met en file d'attente hors ligne.
+  Future<TransactionModel> _operation({
+    required String path,
+    required String type,
+    required SyncOperation operation,
+    required Map<String, dynamic> data,
+    int? soldeSign,
+  }) async {
+    if (_connectivity != null && await _connectivity.isOnline()) {
+      return guardApi(() async {
+        final tx = parseItem(
+          await _apiClient.dio.post(path, data: data),
+          TransactionModel.fromJson,
         );
-        final pageData = res.data['data'] as Map<String, dynamic>;
-        final remote = (pageData['content'] as List)
-            .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        await _localStore?.upsertAll(remote);
-        return remote;
-      } on DioException {
-        if (local.isNotEmpty) return local;
-        rethrow;
-      }
-    }
-
-    return local;
-  }
-
-  Future<List<TransactionModel>> getTransactionsByClient(int clientId) async {
-    final local = await _localStore?.getByClient(clientId) ?? [];
-
-    if (_connectivity != null && await _connectivity.isOnline()) {
-      try {
-        final res =
-            await _apiClient.dio.get('/api/transactions/client/$clientId');
-        final remote = (res.data['data'] as List)
-            .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        await _localStore?.upsertAll(remote);
-        return remote;
-      } on DioException {
-        if (local.isNotEmpty) return local;
-        rethrow;
-      }
-    }
-
-    return local;
-  }
-
-  Future<TransactionModel> depot(Map<String, dynamic> data) async {
-    if (_connectivity != null && await _connectivity.isOnline()) {
-      try {
-        final res =
-            await _apiClient.dio.post('/api/transactions/depot', data: data);
-        final tx = TransactionModel.fromJson(
-            res.data['data'] as Map<String, dynamic>);
         await _localStore?.upsert(tx);
-        if (data['numeroCompte'] != null && data['montant'] != null) {
+        if (soldeSign != null &&
+            data['numeroCompte'] != null &&
+            data['montant'] != null) {
           final montant = (data['montant'] as num).toDouble();
-          await _compteStore?.updateSolde(data['numeroCompte'].toString(), montant);
+          await _compteStore?.updateSolde(
+            data['numeroCompte'].toString(),
+            montant * soldeSign,
+          );
         }
         return tx;
-      } on DioException catch (e) {
-        throw ApiException.fromDioError(e);
-      }
+      });
     }
 
     return _createTransactionOffline(
-      type: 'DEPOT',
-      operation: SyncOperation.depot,
-      data: data,
-    );
-  }
-
-  Future<TransactionModel> retrait(Map<String, dynamic> data) async {
-    if (_connectivity != null && await _connectivity.isOnline()) {
-      try {
-        final res =
-            await _apiClient.dio.post('/api/transactions/retrait', data: data);
-        final tx = TransactionModel.fromJson(
-            res.data['data'] as Map<String, dynamic>);
-        await _localStore?.upsert(tx);
-        if (data['numeroCompte'] != null && data['montant'] != null) {
-          final montant = (data['montant'] as num).toDouble();
-          await _compteStore?.updateSolde(data['numeroCompte'].toString(), -montant);
-        }
-        return tx;
-      } on DioException catch (e) {
-        throw ApiException.fromDioError(e);
-      }
-    }
-
-    return _createTransactionOffline(
-      type: 'RETRAIT',
-      operation: SyncOperation.retrait,
-      data: data,
-    );
-  }
-
-  Future<TransactionModel> transfert(Map<String, dynamic> data) async {
-    if (_connectivity != null && await _connectivity.isOnline()) {
-      try {
-        final res =
-            await _apiClient.dio.post('/api/transactions/transfert', data: data);
-        final tx = TransactionModel.fromJson(
-            res.data['data'] as Map<String, dynamic>);
-        await _localStore?.upsert(tx);
-        return tx;
-      } on DioException catch (e) {
-        throw ApiException.fromDioError(e);
-      }
-    }
-
-    return _createTransactionOffline(
-      type: 'TRANSFERT',
-      operation: SyncOperation.transfert,
+      type: type,
+      operation: operation,
       data: data,
     );
   }
@@ -253,32 +208,24 @@ class TransactionRepository {
     int id, {
     required bool approuve,
     String? motifRejet,
-  }) async {
-    try {
-      final res = await _apiClient.dio.patch(
-        '/api/transactions/$id/valider',
-        data: {
-          'approuve': approuve,
-          if (motifRejet != null && motifRejet.trim().isNotEmpty)
-            'motifRejet': motifRejet.trim(),
-        },
-      );
-      return TransactionModel.fromJson(
-        res.data['data'] as Map<String, dynamic>,
-      );
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
+  }) {
+    return guardApi(() async => parseItem(
+          await _apiClient.dio.patch(
+            '/api/transactions/$id/valider',
+            data: {
+              'approuve': approuve,
+              if (motifRejet != null && motifRejet.trim().isNotEmpty)
+                'motifRejet': motifRejet.trim(),
+            },
+          ),
+          TransactionModel.fromJson,
+        ));
   }
 
-  Future<TransactionModel> executerOperation(int id) async {
-    try {
-      final res = await _apiClient.dio.patch('/api/transactions/$id/executer');
-      return TransactionModel.fromJson(
-        res.data['data'] as Map<String, dynamic>,
-      );
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
+  Future<TransactionModel> executerOperation(int id) {
+    return guardApi(() async => parseItem(
+          await _apiClient.dio.patch('/api/transactions/$id/executer'),
+          TransactionModel.fromJson,
+        ));
   }
 }

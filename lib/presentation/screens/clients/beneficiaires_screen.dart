@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/providers.dart';
+import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/app_dialogs.dart';
 
 /// Provider paramétré pour les bénéficiaires d'un client
 final beneficiairesProvider =
@@ -114,29 +116,14 @@ class _BeneficiairesSheetState
                   .map<Widget>((b) => _BeneficiaireTile(
                         beneficiaire: b,
                         onDelete: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Supprimer'),
-                              content: Text(
-                                  'Supprimer ${b.fullName} ?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(ctx, false),
-                                  child: const Text('Annuler'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () =>
-                                      Navigator.pop(ctx, true),
-                                  style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.error),
-                                  child: const Text('Supprimer'),
-                                ),
-                              ],
-                            ),
+                          final confirm = await AppDialogs.confirm(
+                            context,
+                            title: 'Supprimer',
+                            message: 'Supprimer ${b.fullName} ?',
+                            confirmLabel: 'Supprimer',
+                            confirmColor: AppTheme.error,
                           );
-                          if (confirm == true && context.mounted) {
+                          if (confirm && context.mounted) {
                             try {
                               await ref
                                   .read(beneficiaireRepositoryProvider)
@@ -145,11 +132,7 @@ class _BeneficiairesSheetState
                                   widget.clientId));
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(
-                                  content: Text(e.toString()),
-                                  backgroundColor: AppTheme.error,
-                                ));
+                                context.showErrorSnackBar(e.toString());
                               }
                             }
                           }
