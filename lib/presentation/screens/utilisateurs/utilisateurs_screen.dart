@@ -6,6 +6,7 @@ import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/app_app_bar.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class UtilisateursScreen extends ConsumerWidget {
   const UtilisateursScreen({super.key});
@@ -154,25 +155,13 @@ class _UserCard extends StatelessWidget {
                         .toggleActif(user.id);
                     ref.invalidate(utilisateursProvider);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            user.actif
+                      context.showSuccessSnackBar(user.actif
                                 ? 'Utilisateur désactivé'
-                                : 'Utilisateur activé',
-                          ),
-                          backgroundColor: AppTheme.success,
-                        ),
-                      );
+                                : 'Utilisateur activé',);
                     }
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(e.toString()),
-                          backgroundColor: AppTheme.error,
-                        ),
-                      );
+                      context.showErrorSnackBar(e.toString());
                     }
                   }
                 } else if (action == 'modifier') {
@@ -490,12 +479,7 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
       ref.invalidate(utilisateursProvider);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Utilisateur modifié avec succès'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        context.showSuccessSnackBar('Utilisateur modifié avec succès');
       }
     } catch (e) {
       setState(() => _error = e.toString());

@@ -9,6 +9,7 @@ import '../../widgets/app_text_field.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/app_app_bar.dart';
 import '../../widgets/upload_photo_widget.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class ClientFormScreen extends ConsumerStatefulWidget {
   final int? clientId;
@@ -126,12 +127,7 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
         }
         ref.invalidate(clientsProvider);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Client modifié avec succès'),
-              backgroundColor: AppTheme.success,
-            ),
-          );
+          context.showSuccessSnackBar('Client modifié avec succès');
           context.pop();
         }
       } else {
@@ -145,12 +141,7 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
         }
         ref.invalidate(clientsProvider);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Client créé avec succès'),
-              backgroundColor: AppTheme.success,
-            ),
-          );
+          context.showSuccessSnackBar('Client créé avec succès');
           if (kIsWeb) {
             context.go('/clients/${client.id}');
           } else {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/fichier_repository.dart';
+import '../../core/utils/app_snackbar.dart';
 
 /// Widget d'upload + preview d'une photo.
 /// Fonctionne sur Web (file_selector) et Mobile (file_selector aussi).
@@ -67,12 +68,7 @@ class _UploadPhotoWidgetState extends State<UploadPhotoWidget> {
       await widget.onUpload(bytes, file.name);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur : $e'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        context.showErrorSnackBar('Erreur : $e');
         // Annule la preview si l'upload a échoué
         setState(() => _previewBytes = null);
       }

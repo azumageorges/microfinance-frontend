@@ -45,6 +45,44 @@ class ClientModel {
 
   String get fullName => '$prenom $nom';
 
+  ClientModel copyWith({
+    String? nom,
+    String? prenom,
+    DateTime? dateNaissance,
+    String? lieuNaissance,
+    String? telephone,
+    String? email,
+    String? adresse,
+    String? profession,
+    String? typePieceIdentite,
+    String? numeroPieceIdentite,
+    DateTime? dateExpirationPiece,
+    String? cheminPhoto,
+    String? numeroMembre,
+    String? statut,
+  }) =>
+      ClientModel(
+        id: id,
+        numeroClient: numeroClient,
+        nom: nom ?? this.nom,
+        prenom: prenom ?? this.prenom,
+        dateNaissance: dateNaissance ?? this.dateNaissance,
+        lieuNaissance: lieuNaissance ?? this.lieuNaissance,
+        telephone: telephone ?? this.telephone,
+        email: email ?? this.email,
+        adresse: adresse ?? this.adresse,
+        profession: profession ?? this.profession,
+        typePieceIdentite: typePieceIdentite ?? this.typePieceIdentite,
+        numeroPieceIdentite: numeroPieceIdentite ?? this.numeroPieceIdentite,
+        dateExpirationPiece: dateExpirationPiece ?? this.dateExpirationPiece,
+        cheminPhoto: cheminPhoto ?? this.cheminPhoto,
+        numeroMembre: numeroMembre ?? this.numeroMembre,
+        statut: statut ?? this.statut,
+        createdAt: createdAt,
+        beneficiaires: beneficiaires,
+        nombreComptes: nombreComptes,
+      );
+
   factory ClientModel.fromJson(Map<String, dynamic> json) => ClientModel(
         id: json['id'] as int,
         numeroClient: json['numeroClient'] as String,

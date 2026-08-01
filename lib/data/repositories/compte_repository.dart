@@ -2,9 +2,11 @@ import 'package:dio/dio.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/network/api_request.dart';
 import '../../core/network/connectivity_service.dart';
 import '../local/compte_local_store.dart';
 import '../models/compte_model.dart';
+import 'offline_first.dart';
 
 class CompteRepository {
   final ApiClient _apiClient;
@@ -18,46 +20,28 @@ class CompteRepository {
   })  : _localStore = localStore,
         _connectivity = connectivity;
 
-  Future<List<CompteModel>> getComptes() async {
-    final local = await _localStore.getAll();
-
-    if (await _connectivity.isOnline()) {
-      try {
-        final res = await _apiClient.dio.get('/api/comptes');
-        final remote = (res.data['data'] as List)
-            .map((e) => CompteModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        await _localStore.upsertAll(remote);
-        return remote;
-      } on DioException {
-        if (local.isNotEmpty) return local;
-        rethrow;
-      }
-    }
-
-    if (local.isNotEmpty) return local;
-    return local;
+  Future<List<CompteModel>> getComptes() {
+    return offlineFirstList<CompteModel>(
+      connectivity: _connectivity,
+      local: _localStore.getAll,
+      remote: () async => parseList(
+        await _apiClient.dio.get('/api/comptes'),
+        CompteModel.fromJson,
+      ),
+      cache: _localStore.upsertAll,
+    );
   }
 
-  Future<List<CompteModel>> getComptesByClient(int clientId) async {
-    final local = await _localStore.getByClientId(clientId);
-
-    if (await _connectivity.isOnline() && clientId > 0) {
-      try {
-        final res =
-            await _apiClient.dio.get('/api/comptes/client/$clientId');
-        final remote = (res.data['data'] as List)
-            .map((e) => CompteModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        await _localStore.upsertAllForClient(clientId, remote);
-        return remote;
-      } on DioException {
-        if (local.isNotEmpty) return local;
-        rethrow;
-      }
-    }
-
-    return local;
+  Future<List<CompteModel>> getComptesByClient(int clientId) {
+    return offlineFirstList<CompteModel>(
+      connectivity: clientId > 0 ? _connectivity : null,
+      local: () => _localStore.getByClientId(clientId),
+      remote: () async => parseList(
+        await _apiClient.dio.get('/api/comptes/client/$clientId'),
+        CompteModel.fromJson,
+      ),
+      cache: (comptes) => _localStore.upsertAllForClient(clientId, comptes),
+    );
   }
 
   Future<CompteModel> getCompteByNumero(String numero) async {
@@ -65,8 +49,10 @@ class CompteRepository {
 
     if (await _connectivity.isOnline()) {
       try {
-        final res = await _apiClient.dio.get('/api/comptes/$numero');
-        final remote = CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        final remote = parseItem(
+          await _apiClient.dio.get('/api/comptes/$numero'),
+          CompteModel.fromJson,
+        );
         await _localStore.upsert(remote);
         return remote;
       } on DioException catch (e) {
@@ -79,45 +65,30 @@ class CompteRepository {
     throw ApiException('Compte introuvable en mode hors ligne.');
   }
 
-  Future<CompteModel> createCompte(Map<String, dynamic> data) async {
-    try {
-      final res = await _apiClient.dio.post('/api/comptes', data: data);
-      final compte = CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
+  Future<CompteModel> createCompte(Map<String, dynamic> data) {
+    return guardApi(() async {
+      final compte = parseItem(
+        await _apiClient.dio.post('/api/comptes', data: data),
+        CompteModel.fromJson,
+      );
       await _localStore.upsert(compte);
       return compte;
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
+    });
   }
 
+  Future<CompteModel> bloquerCompte(String numero) =>
+      _patchCompte('/api/comptes/$numero/bloquer');
 
-  Future<CompteModel> bloquerCompte(String numero) async {
-    try {
-      final res =
-          await _apiClient.dio.patch('/api/comptes/$numero/bloquer');
-      return CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
-  }
+  Future<CompteModel> debloquerCompte(String numero) =>
+      _patchCompte('/api/comptes/$numero/debloquer');
 
-  Future<CompteModel> debloquerCompte(String numero) async {
-    try {
-      final res =
-          await _apiClient.dio.patch('/api/comptes/$numero/debloquer');
-      return CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
-  }
+  Future<CompteModel> cloturerCompte(String numero) =>
+      _patchCompte('/api/comptes/$numero/cloturer');
 
-  Future<CompteModel> cloturerCompte(String numero) async {
-    try {
-      final res =
-          await _apiClient.dio.patch('/api/comptes/$numero/cloturer');
-      return CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
+  Future<CompteModel> _patchCompte(String path) {
+    return guardApi(() async => parseItem(
+          await _apiClient.dio.patch(path),
+          CompteModel.fromJson,
+        ));
   }
 }

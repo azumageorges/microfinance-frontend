@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/client_model.dart';
 import '../../../providers/providers.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class CompteFormScreen extends ConsumerStatefulWidget {
   /// Si fourni, le client est pré-sélectionné
@@ -97,12 +98,7 @@ class _CompteFormScreenState extends ConsumerState<CompteFormScreen> {
       ref.invalidate(comptesProvider);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Compte créé avec succès'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        context.showSuccessSnackBar('Compte créé avec succès');
         context.pop();
       }
     } catch (e) {

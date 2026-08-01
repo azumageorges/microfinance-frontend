@@ -7,6 +7,8 @@ import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/app_app_bar.dart';
+import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/app_dialogs.dart';
 
 // ─── Provider dédié : charge directement le crédit par référence ──────────────
 // Évite de charger toute la liste côté client pour trouver un seul élément.
@@ -313,76 +315,26 @@ class CreditDetailScreen extends ConsumerWidget {
 
     // Si rejet : demander le motif obligatoire dans le dialog
     if (!approuve) {
-      final motifCtrl = TextEditingController();
-      final formKey = GlobalKey<FormState>();
-      final result = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Rejeter le crédit ?'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Le crédit sera rejeté définitivement.',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: motifCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Motif du rejet *',
-                    hintText: 'Expliquez la raison du rejet...',
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Le motif est obligatoire' : null,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.pop(ctx, true);
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-              child: const Text('Confirmer le rejet'),
-            ),
-          ],
-        ),
+      motifRejet = await AppDialogs.prompt(
+        context,
+        title: 'Rejeter le crédit ?',
+        message: 'Le crédit sera rejeté définitivement.',
+        label: 'Motif du rejet *',
+        hint: 'Expliquez la raison du rejet...',
+        confirmLabel: 'Confirmer le rejet',
+        confirmColor: AppTheme.error,
       );
-      if (result != true || !context.mounted) return;
-      motifRejet = motifCtrl.text.trim();
+      if (motifRejet == null || !context.mounted) return;
     } else {
-      // Confirmation simple pour l'approbation
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Approuver le crédit ?'),
-          content: const Text(
-              'Le crédit sera validé et en attente de déblocage par le caissier.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
-              child: const Text('Approuver'),
-            ),
-          ],
-        ),
+      final ok = await AppDialogs.confirm(
+        context,
+        title: 'Approuver le crédit ?',
+        message:
+            'Le crédit sera validé et en attente de déblocage par le caissier.',
+        confirmLabel: 'Approuver',
+        confirmColor: AppTheme.success,
       );
-      if (ok != true || !context.mounted) return;
+      if (!ok || !context.mounted) return;
     }
 
     try {
@@ -394,16 +346,11 @@ class CreditDetailScreen extends ConsumerWidget {
       ref.invalidate(creditsProvider);
       ref.invalidate(_creditByReferenceProvider(reference));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(approuve ? 'Crédit approuvé ✓' : 'Crédit rejeté'),
-          backgroundColor:
-              approuve ? AppTheme.success : AppTheme.textSecondary,
-        ));
+        context.showSnackBarWithColor(approuve ? 'Crédit approuvé ✓' : 'Crédit rejeté', approuve ? AppTheme.success : AppTheme.textSecondary);
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()), backgroundColor: AppTheme.error));
+        context.showErrorSnackBar(e);
       }
     }
   }
@@ -413,43 +360,26 @@ class CreditDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     int creditId,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Décaisser ce crédit ?'),
-        content: const Text(
-            'Les fonds seront remis au client après validation préalable du gestionnaire. Cette action est irréversible.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary),
-            child: const Text('Décaisser'),
-          ),
-        ],
-      ),
+    final ok = await AppDialogs.confirm(
+      context,
+      title: 'Décaisser ce crédit ?',
+      message:
+          'Les fonds seront remis au client après validation préalable du gestionnaire. Cette action est irréversible.',
+      confirmLabel: 'Décaisser',
+      confirmColor: AppTheme.primary,
     );
-    if (ok != true || !context.mounted) return;
+    if (!ok || !context.mounted) return;
 
     try {
       await ref.read(creditRepositoryProvider).debloquerCredit(creditId);
       ref.invalidate(creditsProvider);
       ref.invalidate(_creditByReferenceProvider(reference));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Décaissement effectué'),
-          backgroundColor: AppTheme.success,
-        ));
+        context.showSuccessSnackBar('Décaissement effectué');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error));
+        context.showErrorSnackBar(e);
       }
     }
   }
@@ -640,29 +570,15 @@ class _EcheanceTile extends StatelessWidget {
   }
 
   Future<void> _confirmerPaiement(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer le paiement'),
-        content: Text(
+    final ok = await AppDialogs.confirm(
+      context,
+      title: 'Confirmer le paiement',
+      message:
           'Enregistrer le remboursement de l\'échéance ${echeance.numeroEcheance} '
           '(${Formatters.currency(echeance.montantDu)}) ?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success),
-            child: const Text('Confirmer'),
-          ),
-        ],
-      ),
+      confirmColor: AppTheme.success,
     );
-    if (ok != true || !context.mounted) return;
+    if (!ok || !context.mounted) return;
 
     try {
       await ref
@@ -671,16 +587,11 @@ class _EcheanceTile extends StatelessWidget {
       ref.invalidate(creditsProvider);
       onPaid();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Échéance remboursée ✓'),
-          backgroundColor: AppTheme.success,
-        ));
+        context.showSuccessSnackBar('Échéance remboursée ✓');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error));
+        context.showErrorSnackBar(e);
       }
     }
   }

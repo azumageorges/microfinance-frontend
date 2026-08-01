@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
-import '../../core/network/api_exception.dart';
+import '../../core/network/api_request.dart';
 import '../../core/constants/app_constants.dart';
 
 class FichierRepository {
@@ -17,43 +17,26 @@ class FichierRepository {
   }
 
   /// Upload la photo d'un client
-  Future<void> uploadPhotoClient(int clientId, Uint8List bytes,
-      String filename) async {
-    try {
-      final formData = FormData.fromMap({
-        'fichier': MultipartFile.fromBytes(
-          bytes,
-          filename: filename,
-          contentType: DioMediaType('image', _ext(filename)),
-        ),
-      });
-      await _apiClient.dio.patch(
-        '/api/clients/$clientId/photo',
-        data: formData,
-      );
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
-  }
+  Future<void> uploadPhotoClient(
+          int clientId, Uint8List bytes, String filename) =>
+      _upload('/api/clients/$clientId/photo', bytes, filename);
 
   /// Upload la pièce d'identité d'un client
-  Future<void> uploadPieceIdentite(int clientId, Uint8List bytes,
-      String filename) async {
-    try {
-      final formData = FormData.fromMap({
-        'fichier': MultipartFile.fromBytes(
-          bytes,
-          filename: filename,
-          contentType: DioMediaType('image', _ext(filename)),
-        ),
-      });
-      await _apiClient.dio.patch(
-        '/api/clients/$clientId/piece-identite',
-        data: formData,
-      );
-    } on DioException catch (e) {
-      throw ApiException.fromDioError(e);
-    }
+  Future<void> uploadPieceIdentite(
+          int clientId, Uint8List bytes, String filename) =>
+      _upload('/api/clients/$clientId/piece-identite', bytes, filename);
+
+  Future<void> _upload(String path, Uint8List bytes, String filename) {
+    return guardApi(() => _apiClient.dio.patch(
+          path,
+          data: FormData.fromMap({
+            'fichier': MultipartFile.fromBytes(
+              bytes,
+              filename: filename,
+              contentType: DioMediaType('image', _ext(filename)),
+            ),
+          }),
+        ));
   }
 
   String _ext(String filename) {
