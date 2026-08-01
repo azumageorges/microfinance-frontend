@@ -1,15 +1,18 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
-import '../../core/constants/app_constants.dart';
+import '../../core/storage/secure_session_storage.dart';
 import '../models/auth_model.dart';
 
 class AuthRepository {
   final ApiClient _apiClient;
+  final SecureSessionStorage sessionStorage;
 
-  AuthRepository(this._apiClient);
+  AuthRepository(
+    this._apiClient, {
+    this.sessionStorage = const SecureSessionStorage(),
+  });
 
   Future<AuthResponse> login(String email, String password) async {
     try {
@@ -20,10 +23,12 @@ class AuthRepository {
       final data = response.data['data'] as Map<String, dynamic>;
       final auth = AuthResponse.fromJson(data);
 
-      // Persister le token et les infos utilisateur
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.tokenKey, auth.token);
-      await prefs.setString(AppConstants.userKey, jsonEncode(auth.toJson()));
+      // Persister le token (stockage chiffré) et le profil utilisateur.
+      // Le profil est sérialisé sans le JWT pour ne pas le dupliquer.
+      await sessionStorage.writeSession(
+        token: auth.token,
+        userJson: jsonEncode(auth.toJson(includeToken: false)),
+      );
 
       return auth;
     } on DioException catch (e) {
@@ -32,34 +37,28 @@ class AuthRepository {
   }
 
   Future<AuthResponse?> getStoredUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AppConstants.tokenKey);
-    final userJson = prefs.getString(AppConstants.userKey);
+    final token = await sessionStorage.readToken();
+    final userJson = await sessionStorage.readUser();
 
     // Evite un faux état "connecté" si l'utilisateur est en cache
     // mais que le JWT n'est plus présent.
     if (token == null || token.isEmpty || userJson == null) {
-      await prefs.remove(AppConstants.tokenKey);
-      await prefs.remove(AppConstants.userKey);
+      await clearLocalSession();
       return null;
     }
 
-    return AuthResponse.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
+    final user = jsonDecode(userJson) as Map<String, dynamic>;
+    return AuthResponse.fromJson({...user, 'token': token});
   }
 
-  Future<void> clearLocalSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(AppConstants.tokenKey);
-    await prefs.remove(AppConstants.userKey);
-  }
+  Future<void> clearLocalSession() => sessionStorage.clear();
 
   /// Révoque le token JWT côté serveur puis supprime les données locales.
   Future<void> logout() async {
     // 1. Révoquer le token côté backend (blacklist JWT)
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
-      if (token != null) {
+      final token = await sessionStorage.readToken();
+      if (token != null && token.isNotEmpty) {
         await _apiClient.dio.post(
           '/api/auth/logout',
           options: Options(headers: {'Authorization': 'Bearer $token'}),
@@ -72,4 +71,3 @@ class AuthRepository {
     await clearLocalSession();
   }
 }
-

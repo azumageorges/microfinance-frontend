@@ -1,7 +1,7 @@
 ﻿import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
+import '../storage/secure_session_storage.dart';
 import 'retry_interceptor.dart';
 
 /// Callback appelÃƒÆ’Ã‚Â© quand le token est expirÃƒÆ’Ã‚Â© (401) pour dÃƒÆ’Ã‚Â©clencher le logout
@@ -47,6 +47,7 @@ class ApiClient {
 /// et gÃƒÆ’Ã‚Â¨re la dÃƒÆ’Ã‚Â©connexion automatique sur 401
 class _AuthInterceptor extends Interceptor {
   final ApiClient _client;
+  final SecureSessionStorage sessionStorage = const SecureSessionStorage();
 
   _AuthInterceptor(this._client);
 
@@ -55,8 +56,7 @@ class _AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AppConstants.tokenKey);
+    final token = await sessionStorage.readToken();
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
     }

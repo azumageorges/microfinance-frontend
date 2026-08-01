@@ -18,7 +18,7 @@ class AuthResponse {
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) => AuthResponse(
-        token: json['token'] as String,
+        token: json['token'] as String? ?? '',
         type: json['type'] as String? ?? 'Bearer',
         userId: (json['userId'] as num).toInt(),
         nom: json['nom'] as String,
@@ -56,8 +56,8 @@ class AuthResponse {
   bool get canValidateCredits => isGestionnaire;
   bool get canDebloquerCredits => isCaissier;
 
-  Map<String, dynamic> toJson() => {
-        'token': token,
+  Map<String, dynamic> toJson({bool includeToken = true}) => {
+        if (includeToken) 'token': token,
         'type': type,
         'userId': userId,
         'nom': nom,
