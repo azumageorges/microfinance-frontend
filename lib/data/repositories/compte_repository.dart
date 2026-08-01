@@ -29,9 +29,11 @@ class CompteRepository {
             .toList();
         await _localStore.upsertAll(remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -51,9 +53,11 @@ class CompteRepository {
             .toList();
         await _localStore.upsertAllForClient(clientId, remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -72,6 +76,8 @@ class CompteRepository {
       } on DioException catch (e) {
         if (local != null) return local;
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -87,6 +93,8 @@ class CompteRepository {
       return compte;
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -98,6 +106,8 @@ class CompteRepository {
       return CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -108,6 +118,8 @@ class CompteRepository {
       return CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -118,6 +130,8 @@ class CompteRepository {
       return CompteModel.fromJson(res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 }

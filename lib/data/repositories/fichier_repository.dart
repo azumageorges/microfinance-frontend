@@ -33,6 +33,8 @@ class FichierRepository {
       );
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -53,6 +55,8 @@ class FichierRepository {
       );
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 

@@ -40,14 +40,11 @@ class ClientRepository {
         await _localStore.upsertAll(remote);
         await _syncService?.syncPendingChanges();
         return _mergeWithPending(await _localStore.getAll(), remote);
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        throw ApiException.fromDioError(
-          DioException(
-            type: DioExceptionType.connectionError,
-            requestOptions: RequestOptions(),
-          ),
-        );
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -70,6 +67,8 @@ class ClientRepository {
       } on DioException catch (e) {
         if (local != null) return local;
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -89,8 +88,12 @@ class ClientRepository {
             .toList();
         await _localStore.upsertAll(remote);
         return remote;
-      } on DioException {
-        return _localStore.search(query);
+      } on DioException catch (e) {
+        final localResults = await _localStore.search(query);
+        if (localResults.isNotEmpty) return localResults;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -107,6 +110,8 @@ class ClientRepository {
         return client;
       } on DioException catch (e) {
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -158,6 +163,8 @@ class ClientRepository {
         return client;
       } on DioException catch (e) {
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -234,6 +241,8 @@ class ClientRepository {
         return client;
       } on DioException catch (e) {
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 

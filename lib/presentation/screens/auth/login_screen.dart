@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../providers/providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -44,8 +45,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               receiveTimeout: const Duration(seconds: 60),
             ),
           );
-    } catch (_) {
-      // Silencieux : le but est juste de "réveiller" le backend si besoin.
+    } catch (e, stackTrace) {
+      // Non bloquant : le but est juste de "réveiller" le backend si besoin.
+      AppLogger.warning('Warmup du backend échoué', e, stackTrace);
     }
   }
 

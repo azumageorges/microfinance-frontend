@@ -11,6 +11,7 @@ import 'package:printing/printing.dart';
 import '../../data/models/carte_model.dart';
 import '../../data/repositories/fichier_repository.dart';
 import '../theme/carte_theme.dart';
+import 'app_logger.dart';
 
 /// Génère un PDF contenant **uniquement** la carte membre (format ISO 7810),
 /// prête à imprimer et découper pour remise au client.
@@ -48,7 +49,8 @@ class CartePdfService {
       final image = await boundary.toImage(pixelRatio: pixelRatio);
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
       return data?.buffer.asUint8List();
-    } catch (_) {
+    } catch (e, stackTrace) {
+      AppLogger.error('Capture de la carte en image échouée', e, stackTrace);
       return null;
     }
   }
@@ -407,11 +409,19 @@ class CartePdfService {
         return Uint8List.fromList(res.data!);
       }
       return null;
-    } catch (_) { return null; }
+    } catch (e, stackTrace) {
+      AppLogger.warning('Téléchargement de $url échoué', e, stackTrace);
+      return null;
+    }
   }
 
   static Uint8List? _decodeBase64(String b64) {
-    try { return base64Decode(b64); } catch (_) { return null; }
+    try {
+      return base64Decode(b64);
+    } catch (e, stackTrace) {
+      AppLogger.warning('Photo base64 illisible', e, stackTrace);
+      return null;
+    }
   }
 
   static String _shortDate(String iso) {

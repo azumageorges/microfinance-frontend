@@ -15,6 +15,8 @@ class DashboardRepository {
           res.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 }

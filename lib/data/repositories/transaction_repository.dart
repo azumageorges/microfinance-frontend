@@ -39,9 +39,11 @@ class TransactionRepository {
             .toList();
         await _localStore?.upsertAll(remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -67,9 +69,11 @@ class TransactionRepository {
             .toList();
         await _localStore?.upsertAll(remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -95,9 +99,11 @@ class TransactionRepository {
             .toList();
         await _localStore?.upsertAll(remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -116,9 +122,11 @@ class TransactionRepository {
             .toList();
         await _localStore?.upsertAll(remote);
         return remote;
-      } on DioException {
+      } on DioException catch (e) {
         if (local.isNotEmpty) return local;
-        rethrow;
+        throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -140,6 +148,8 @@ class TransactionRepository {
         return tx;
       } on DioException catch (e) {
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -165,6 +175,8 @@ class TransactionRepository {
         return tx;
       } on DioException catch (e) {
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -186,6 +198,8 @@ class TransactionRepository {
         return tx;
       } on DioException catch (e) {
         throw ApiException.fromDioError(e);
+      } catch (e, stackTrace) {
+        throw ApiException.from(e, stackTrace);
       }
     }
 
@@ -268,6 +282,8 @@ class TransactionRepository {
       );
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 
@@ -279,6 +295,8 @@ class TransactionRepository {
       );
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
+    } catch (e, stackTrace) {
+      throw ApiException.from(e, stackTrace);
     }
   }
 }
