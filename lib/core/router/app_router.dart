@@ -90,6 +90,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (location.startsWith('/cartes') && !auth.canAccessDashboard) {
         return auth.homeRoute;
       }
+      if (location.startsWith('/rapports') && !auth.canAccessDashboard) {
+        return auth.homeRoute;
+      }
 
       return null;
     },
