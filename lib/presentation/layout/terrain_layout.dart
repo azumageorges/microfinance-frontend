@@ -53,7 +53,7 @@ class TerrainLayout extends ConsumerWidget {
         selectedIndex: currentIndex < 0 ? 0 : currentIndex,
         onDestinationSelected: (i) => context.go(navItems[i].path),
         destinations: navItems
-            .map((item) => NavigationDestination(
+            .map<NavigationDestination>((item) => NavigationDestination(
                   icon: Icon(item.icon),
                   selectedIcon: Icon(item.activeIcon),
                   label: item.label,

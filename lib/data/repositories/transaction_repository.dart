@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
@@ -8,8 +9,9 @@ import '../local/sync_queue_store.dart';
 import '../local/sync_status.dart';
 import '../local/transaction_local_store.dart';
 import '../models/transaction_model.dart';
+import 'transaction_repository_interface.dart';
 
-class TransactionRepository {
+class TransactionRepository implements ITransactionRepository {
   final ApiClient _apiClient;
   final TransactionLocalStore? _localStore;
   final CompteLocalStore? _compteStore;
@@ -18,23 +20,20 @@ class TransactionRepository {
 
   TransactionRepository(
     this._apiClient, {
-    TransactionLocalStore? localStore,
-    CompteLocalStore? compteStore,
-    SyncQueueStore? syncQueue,
-    ConnectivityService? connectivity,
-  })  : _localStore = localStore,
-        _compteStore = compteStore,
-        _syncQueue = syncQueue,
-        _connectivity = connectivity;
+    this._localStore,
+    this._compteStore,
+    this._syncQueue,
+    this._connectivity,
+  });
 
-  /// Toutes les transactions sans pagination — pour rapports et dashboard caissier/agent
+  @override
   Future<List<TransactionModel>> getAllTransactions() async {
     final local = await _localStore?.getAll() ?? [];
 
     if (_connectivity != null && await _connectivity.isOnline()) {
       try {
         final res = await _apiClient.dio.get('/api/transactions/all');
-        final remote = (res.data['data'] as List)
+        final remote = (res.data['data'] as List<dynamic>)
             .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
             .toList();
         await _localStore?.upsertAll(remote);
@@ -62,7 +61,7 @@ class TransactionRepository {
           queryParameters: {'page': page, 'size': size},
         );
         final pageData = res.data['data'] as Map<String, dynamic>;
-        final remote = (pageData['content'] as List)
+        final remote = (pageData['content'] as List<dynamic>)
             .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
             .toList();
         await _localStore?.upsertAll(remote);
@@ -76,6 +75,7 @@ class TransactionRepository {
     return local;
   }
 
+  @override
   Future<List<TransactionModel>> getTransactionsByCompte(
     String numeroCompte, {
     int page = 0,
@@ -90,7 +90,7 @@ class TransactionRepository {
           queryParameters: {'page': page, 'size': size},
         );
         final pageData = res.data['data'] as Map<String, dynamic>;
-        final remote = (pageData['content'] as List)
+        final remote = (pageData['content'] as List<dynamic>)
             .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
             .toList();
         await _localStore?.upsertAll(remote);
@@ -104,6 +104,7 @@ class TransactionRepository {
     return local;
   }
 
+  @override
   Future<List<TransactionModel>> getTransactionsByClient(int clientId) async {
     final local = await _localStore?.getByClient(clientId) ?? [];
 
@@ -111,7 +112,7 @@ class TransactionRepository {
       try {
         final res =
             await _apiClient.dio.get('/api/transactions/client/$clientId');
-        final remote = (res.data['data'] as List)
+        final remote = (res.data['data'] as List<dynamic>)
             .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
             .toList();
         await _localStore?.upsertAll(remote);
@@ -125,11 +126,51 @@ class TransactionRepository {
     return local;
   }
 
+  @override
+  Future<TransactionModel> createTransaction(Map<String, dynamic> data) async {
+    if (_connectivity != null && await _connectivity.isOnline()) {
+      try {
+        final res = await _apiClient.dio.post('/api/transactions', data: data);
+        final tx = TransactionModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        await _localStore?.upsert(tx);
+        return tx;
+      } on DioException catch (e) {
+        throw ApiException.fromDioError(e);
+      }
+    }
+    throw ApiException('Création de transaction impossible hors ligne');
+  }
+
+  @override
+  Future<TransactionModel> getTransactionById(int id) async {
+    final local = await _localStore?.getById(id);
+    
+    if (_connectivity != null && await _connectivity.isOnline()) {
+      try {
+        final res = await _apiClient.dio.get('/api/transactions/$id');
+        final tx = TransactionModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        await _localStore?.upsert(tx);
+        return tx;
+      } on DioException catch (e) {
+        if (local != null) return local;
+        throw ApiException.fromDioError(e);
+      }
+    }
+    
+    if (local != null) return local;
+    throw ApiException('Transaction introuvable en mode hors ligne.');
+  }
+
+  @override
   Future<TransactionModel> depot(Map<String, dynamic> data) async {
     if (_connectivity != null && await _connectivity.isOnline()) {
       try {
+        debugPrint('[DEPOT] POST /api/transactions/depot');
+        debugPrint('[DEPOT] Request Body: $data');
         final res =
             await _apiClient.dio.post('/api/transactions/depot', data: data);
+        debugPrint('[DEPOT] Response Status: ${res.statusCode}');
+        debugPrint('[DEPOT] Response Body: ${res.data}');
         final tx = TransactionModel.fromJson(
             res.data['data'] as Map<String, dynamic>);
         await _localStore?.upsert(tx);
@@ -139,6 +180,9 @@ class TransactionRepository {
         }
         return tx;
       } on DioException catch (e) {
+        debugPrint('[DEPOT] ERROR: ${e.message}');
+        debugPrint('[DEPOT] Status: ${e.response?.statusCode}');
+        debugPrint('[DEPOT] Response: ${e.response?.data}');
         throw ApiException.fromDioError(e);
       }
     }
@@ -150,6 +194,7 @@ class TransactionRepository {
     );
   }
 
+  @override
   Future<TransactionModel> retrait(Map<String, dynamic> data) async {
     if (_connectivity != null && await _connectivity.isOnline()) {
       try {
@@ -158,10 +203,6 @@ class TransactionRepository {
         final tx = TransactionModel.fromJson(
             res.data['data'] as Map<String, dynamic>);
         await _localStore?.upsert(tx);
-        if (data['numeroCompte'] != null && data['montant'] != null) {
-          final montant = (data['montant'] as num).toDouble();
-          await _compteStore?.updateSolde(data['numeroCompte'].toString(), -montant);
-        }
         return tx;
       } on DioException catch (e) {
         throw ApiException.fromDioError(e);
@@ -175,6 +216,7 @@ class TransactionRepository {
     );
   }
 
+  @override
   Future<TransactionModel> transfert(Map<String, dynamic> data) async {
     if (_connectivity != null && await _connectivity.isOnline()) {
       try {
@@ -209,17 +251,22 @@ class TransactionRepository {
     double? soldeApres;
     final compte = await _compteStore?.getByNumero(numeroCompte);
     if (compte != null) {
-      final delta = type == 'DEPOT' ? montant : -montant;
+      final delta = type == 'DEPOT' ? montant : 0.0;
       soldeApres = compte.solde + delta;
-      await _compteStore?.updateSolde(numeroCompte, delta);
+      if (delta != 0) {
+        await _compteStore?.updateSolde(numeroCompte, delta);
+      }
     }
+
+    final statut = type == 'DEPOT' ? 'EXECUTEE' : 'EN_ATTENTE';
 
     final tx = TransactionModel(
       id: localId,
       reference: 'TX-OFFLINE-${now.millisecondsSinceEpoch}',
       typeTransaction: type,
-      statut: 'EXECUTEE',
+      statut: statut,
       montant: montant,
+      motif: data['motif'] as String?,
       soldeApres: soldeApres,
       description: data['description'] as String?,
       numeroCompte: numeroCompte,
@@ -249,6 +296,7 @@ class TransactionRepository {
     return tx;
   }
 
+  @override
   Future<TransactionModel> validerOperation(
     int id, {
     required bool approuve,
@@ -271,6 +319,7 @@ class TransactionRepository {
     }
   }
 
+  @override
   Future<TransactionModel> executerOperation(int id) async {
     try {
       final res = await _apiClient.dio.patch('/api/transactions/$id/executer');

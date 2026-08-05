@@ -92,12 +92,16 @@ class CreditModel {
   final String? statutLabelBackend;
   final String? motifDemande;
   final String? motifRejet;
+  final String? motifRejetDeblocage;
   final DateTime? dateDemande;
   final DateTime? dateValidation;
+  final DateTime? dateDemandeDeblocage;
   final DateTime? dateDeblocage;
   final DateTime? dateFin;
   final String numeroCompte;
   final String? nomClient;
+  final String? debloquePar;
+  final String? deblocageValidePar;
   final DateTime? createdAt;
   final List<EcheanceModel> echeances;
 
@@ -116,12 +120,16 @@ class CreditModel {
     this.statutLabelBackend,
     this.motifDemande,
     this.motifRejet,
+    this.motifRejetDeblocage,
     this.dateDemande,
     this.dateValidation,
+    this.dateDemandeDeblocage,
     this.dateDeblocage,
     this.dateFin,
     required this.numeroCompte,
     this.nomClient,
+    this.debloquePar,
+    this.deblocageValidePar,
     this.createdAt,
     this.echeances = const [],
   });
@@ -130,6 +138,7 @@ class CreditModel {
     const labels = {
       'EN_ATTENTE': 'En attente',
       'VALIDE': 'Validé',
+      'DEBLOCAGE_EN_ATTENTE': 'Déblocage en attente',
       'REJETE': 'Rejeté',
       'EN_COURS': 'En cours',
       'REMBOURSE': 'Remboursé',
@@ -196,13 +205,23 @@ class CreditModel {
         motifRejet: json['motifRejet'] != null
             ? _stringValue(json['motifRejet'])
             : null,
+        motifRejetDeblocage: json['motifRejetDeblocage'] != null
+            ? _stringValue(json['motifRejetDeblocage'])
+            : null,
         dateDemande: _dateTimeValue(json['dateDemande']),
         dateValidation: _dateTimeValue(json['dateValidation']),
+        dateDemandeDeblocage: _dateTimeValue(json['dateDemandeDeblocage']),
         dateDeblocage: _dateTimeValue(json['dateDeblocage']),
         dateFin: _dateTimeValue(json['dateFin']),
         numeroCompte: _stringValue(json['numeroCompte'], 'N/A'),
         nomClient: json['nomClient'] != null
             ? _stringValue(json['nomClient'])
+            : null,
+        debloquePar: json['debloquePar'] != null
+            ? _stringValue(json['debloquePar'])
+            : null,
+        deblocageValidePar: json['deblocageValidePar'] != null
+            ? _stringValue(json['deblocageValidePar'])
             : null,
         createdAt: _dateTimeValue(json['createdAt']),
         echeances: (json['echeances'] as List<dynamic>? ?? [])

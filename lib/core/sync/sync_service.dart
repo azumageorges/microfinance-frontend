@@ -67,6 +67,7 @@ class SyncService {
     if (!await _connectivity.isOnline()) return;
 
     _syncing = true;
+    int syncedCount = 0;
     try {
       final items = await _syncQueue.getAll();
       for (final item in items) {
@@ -78,8 +79,6 @@ class SyncService {
               } else if (item.operation == SyncOperation.update) {
                 await _syncClientUpdate(item);
               }
-              break;
-
             case SyncEntityType.transaction:
               if (item.operation == SyncOperation.depot) {
                 await _syncTransactionDepot(item);
@@ -88,23 +87,24 @@ class SyncService {
               } else if (item.operation == SyncOperation.transfert) {
                 await _syncTransactionTransfert(item);
               }
-              break;
-
             case SyncEntityType.compte:
               if (item.operation == SyncOperation.create) {
                 await _syncCompteCreate(item);
               }
-              break;
-
             default:
               break;
           }
+          syncedCount++;
         } catch (e) {
           debugPrint('Sync failed for queue item ${item.id} (${item.entityType}): $e');
           await _syncQueue.incrementRetry(item.id);
         }
       }
-      onSyncCompleted?.call();
+      // N'appeler onSyncCompleted que si au moins un item a été synchronisé
+      // pour éviter des rebuilds Riverpod inutiles.
+      if (syncedCount > 0) {
+        onSyncCompleted?.call();
+      }
     } finally {
       _syncing = false;
     }
@@ -191,7 +191,7 @@ class SyncService {
 
     try {
       final res = await _apiClient.dio.get('/api/clients');
-      final clients = (res.data['data'] as List)
+      final clients = (res.data['data'] as List<dynamic>)
           .map((e) => ClientModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _clientStore.upsertAll(clients);
@@ -205,7 +205,7 @@ class SyncService {
 
     try {
       final res = await _apiClient.dio.get('/api/comptes');
-      final comptes = (res.data['data'] as List)
+      final comptes = (res.data['data'] as List<dynamic>)
           .map((e) => CompteModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _compteStore.upsertAll(comptes);
@@ -219,7 +219,7 @@ class SyncService {
 
     try {
       final res = await _apiClient.dio.get('/api/transactions/all');
-      final txs = (res.data['data'] as List)
+      final txs = (res.data['data'] as List<dynamic>)
           .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _transactionStore.upsertAll(txs);
@@ -233,7 +233,7 @@ class SyncService {
 
     try {
       final res = await _apiClient.dio.get('/api/credits');
-      final credits = (res.data['data'] as List)
+      final credits = (res.data['data'] as List<dynamic>)
           .map((e) => CreditModel.fromJson(e as Map<String, dynamic>))
           .toList();
       await _creditStore.upsertAll(credits);

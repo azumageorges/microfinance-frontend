@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../data/models/transaction_model.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/stat_card.dart';
@@ -200,7 +201,7 @@ class CaissierDashboardScreen extends ConsumerWidget {
                             child: Column(
                               children: txAujourdhui
                                   .take(10)
-                                  .map((tx) => _TxTile(tx: tx))
+                                  .map<Widget>((tx) => _TxTile(tx: tx))
                                   .toList(),
                             ),
                           ),
@@ -330,7 +331,7 @@ class _ActionCard extends StatelessWidget {
 }
 
 class _TxTile extends StatelessWidget {
-  final dynamic tx;
+  final TransactionModel tx;
   const _TxTile({required this.tx});
 
   @override

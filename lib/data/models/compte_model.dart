@@ -9,6 +9,7 @@ class CompteModel {
   final int? dureeEnMois;
   final DateTime? dateOuverture;
   final DateTime? dateEcheance;
+  final double? montantAvecInterets;
   final double? montantCible;
   final String? representantLegal;
   final int clientId;
@@ -27,6 +28,7 @@ class CompteModel {
     this.dureeEnMois,
     this.dateOuverture,
     this.dateEcheance,
+    this.montantAvecInterets,
     this.montantCible,
     this.representantLegal,
     required this.clientId,
@@ -41,9 +43,7 @@ class CompteModel {
     const labels = {
       'EPARGNE': 'Épargne',
       'DAT': 'Dépôt à Terme',
-      'BLOQUE': 'Bloqué',
       'CREDIT': 'Crédit',
-      'ACHAT': 'Achat',
       'ENFANT': 'Enfant',
     };
     return labels[typeCompte] ?? typeCompte;
@@ -69,6 +69,9 @@ class CompteModel {
             : null,
         dateEcheance: json['dateEcheance'] != null
             ? DateTime.tryParse(json['dateEcheance'].toString())
+            : null,
+        montantAvecInterets: json['montantAvecInterets'] != null
+            ? (json['montantAvecInterets'] as num).toDouble()
             : null,
         montantCible: json['montantCible'] != null
             ? (json['montantCible'] as num).toDouble()

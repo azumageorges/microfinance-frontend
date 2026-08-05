@@ -1,10 +1,10 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 import 'retry_interceptor.dart';
 
-/// Callback appelÃƒÆ’Ã‚Â© quand le token est expirÃƒÆ’Ã‚Â© (401) pour dÃƒÆ’Ã‚Â©clencher le logout
+/// Callback appelé quand le token est expiré (401) pour déclencher le logout
 typedef OnUnauthorized = void Function();
 
 class ApiClient {
@@ -12,21 +12,13 @@ class ApiClient {
   OnUnauthorized? onUnauthorized;
 
   ApiClient() {
-    // URL du backend selon la plateforme, avec possibilitÃƒÆ’Ã‚Â© de surcharge
-    // via `--dart-define=API_BASE_URL=...`.
     final baseUrl = AppConstants.baseUrl;
     if (kDebugMode) {
       debugPrint('[API BASE URL] $baseUrl');
     }
 
-    // Sur Flutter Web, le "premier appel" peut subir un dÃƒÆ’Ã‚Â©lai important
-    // (ex: cold start du backend). On tolÃƒÆ’Ã‚Â¨re donc un connectTimeout plus long.
-    final connectTimeout = kIsWeb
-        ? const Duration(seconds: 45)
-        : const Duration(seconds: 15);
-    final receiveTimeout = kIsWeb
-        ? const Duration(seconds: 60)
-        : const Duration(seconds: 30);
+    final connectTimeout = const Duration(seconds: 45);
+    final receiveTimeout = const Duration(seconds: 60);
 
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
@@ -43,8 +35,8 @@ class ApiClient {
   Dio get dio => _dio;
 }
 
-/// Injecte automatiquement le JWT dans chaque requÃƒÆ’Ã‚Âªte
-/// et gÃƒÆ’Ã‚Â¨re la dÃƒÆ’Ã‚Â©connexion automatique sur 401
+/// Injecte automatiquement le JWT dans chaque requête
+/// et gère la déconnexion automatique sur 401
 class _AuthInterceptor extends Interceptor {
   final ApiClient _client;
 
@@ -70,7 +62,6 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // Token expirÃƒÆ’Ã‚Â© ou invalide ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ dÃƒÆ’Ã‚Â©clencher le logout
     final statusCode = err.response?.statusCode;
     final path = err.requestOptions.path;
     final isAuthEndpoint = path.startsWith('/api/auth/');
@@ -81,26 +72,43 @@ class _AuthInterceptor extends Interceptor {
   }
 }
 
-/// Logs en mode debug uniquement
+/// Logs détaillés en mode debug uniquement
 class _LogInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    debugPrint('[API ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶] ${options.method} ${options.path}');
+    debugPrint('┌─────────────────────────────────────────────');
+    debugPrint('│ [API →] ${options.method} ${options.baseUrl}${options.path}');
+    if (options.queryParameters.isNotEmpty) {
+      debugPrint('│ Query:  ${options.queryParameters}');
+    }
+    if (options.data != null) {
+      debugPrint('│ Body:   ${options.data}');
+    }
+    debugPrint('└─────────────────────────────────────────────');
     handler.next(options);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    debugPrint('[API ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“] ${response.statusCode} ${response.requestOptions.path}');
+    debugPrint('┌─────────────────────────────────────────────');
+    debugPrint(
+        '│ [API ✓] ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.path}');
+    debugPrint('│ Body:   ${response.data}');
+    debugPrint('└─────────────────────────────────────────────');
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    debugPrint('[API ÃƒÂ¢Ã…â€œÃ¢â‚¬â€] ${err.response?.statusCode} ${err.message}');
+    debugPrint('┌─────────────────────────────────────────────');
+    debugPrint(
+        '│ [API ✗] ${err.response?.statusCode} ${err.requestOptions.method} ${err.requestOptions.path}');
+    debugPrint('│ Type:   ${err.type}');
+    debugPrint('│ Msg:    ${err.message}');
+    if (err.response?.data != null) {
+      debugPrint('│ Body:   ${err.response?.data}');
+    }
+    debugPrint('└─────────────────────────────────────────────');
     handler.next(err);
   }
 }
-
-
-

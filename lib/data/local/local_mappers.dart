@@ -131,14 +131,26 @@ class LocalMappers {
         id: row['id'] as int,
         reference: row['numero_transaction'] as String? ?? 'LOCAL-${row['id']}',
         typeTransaction: row['type'] as String,
-        statut: 'EXECUTEE',
+        statut: row['statut'] as String? ?? 'EXECUTEE',
         montant: (row['montant'] as num).toDouble(),
+        soldeAvant: row['solde_avant'] != null
+            ? (row['solde_avant'] as num).toDouble()
+            : null,
         soldeApres: row['solde_apres'] != null
             ? (row['solde_apres'] as num).toDouble()
             : null,
+        motif: row['motif'] as String?,
         description: row['description'] as String?,
+        motifRejet: row['motif_rejet'] as String?,
         numeroCompte: row['numero_compte'] as String,
+        numeroCompteDestination: row['numero_compte_destination'] as String?,
+        nomClient: row['nom_client'] as String?,
+        effectuePar: row['effectue_par'] as String?,
+        initiePar: row['initie_par'] as String?,
+        validePar: row['valide_par'] as String?,
         dateTransaction: _parseDate(row['date']) ?? DateTime.now(),
+        dateValidation: _parseDate(row['date_validation']),
+        dateExecution: _parseDate(row['date_execution']),
       );
 
   static Map<String, dynamic> transactionToRow(
@@ -151,53 +163,115 @@ class LocalMappers {
         'local_id': localId,
         'numero_transaction': transaction.reference,
         'type': transaction.typeTransaction,
+        'statut': transaction.statut,
         'montant': transaction.montant,
         'date': transaction.dateTransaction.toIso8601String(),
+        'solde_avant': transaction.soldeAvant,
         'solde_apres': transaction.soldeApres,
+        'motif': transaction.motif,
         'description': transaction.description,
+        'motif_rejet': transaction.motifRejet,
         'numero_compte': transaction.numeroCompte,
+        'numero_compte_destination': transaction.numeroCompteDestination,
+        'nom_client': transaction.nomClient,
+        'effectue_par': transaction.effectuePar,
+        'initie_par': transaction.initiePar,
+        'valide_par': transaction.validePar,
+        'date_validation': transaction.dateValidation?.toIso8601String(),
+        'date_execution': transaction.dateExecution?.toIso8601String(),
         'sync_status': syncStatus.value,
         'created_at': transaction.dateTransaction.toIso8601String(),
       };
 
-  static CreditModel creditFromRow(Map<String, dynamic> row) => CreditModel(
-        id: row['id'] as int,
-        referenceCredit: row['numero_credit'] as String,
-        montantAccorde: row['montant_accorde'] != null
-            ? (row['montant_accorde'] as num).toDouble()
-            : null,
-        typeCredit: (row['duree_en_mois'] as int? ?? 1) == 1 ? 'QUINZAINE' : 'MENSUEL',
-        miseQuotidienne: 0,
-        fraisCredit: 0,
-        nombreEcheances: row['duree_en_mois'] as int? ?? 1,
-        totalRembourse: 0,
-        statut: row['statut'] as String? ?? 'EN_ATTENTE',
-        numeroCompte: '',
-        nomClient: row['nom_client'] != null && row['prenom_client'] != null
-            ? '${row['nom_client']} ${row['prenom_client']}'
-            : null,
-        dateDemande: _parseDate(row['date_demande']),
-        createdAt: _parseDate(row['created_at']),
-      );
+  static CreditModel creditFromRow(Map<String, dynamic> row) {
+    // Désérialisation des échéances stockées en JSON
+    final echeancesJson = row['echeances_json'] as String?;
+    final echeances = (echeancesJson != null && echeancesJson.isNotEmpty)
+        ? (jsonDecode(echeancesJson) as List)
+            .map((e) => EcheanceModel.fromJson(e as Map<String, dynamic>))
+            .toList()
+        : <EcheanceModel>[];
+
+    return CreditModel(
+      id:                     row['id'] as int,
+      referenceCredit:        row['reference_credit'] as String? ?? '',
+      montantAccorde:         _toDoubleOrNull(row['montant_accorde']),
+      typeCredit:             row['type_credit'] as String? ?? 'MENSUEL',
+      miseQuotidienne:        _toDouble(row['mise_quotidienne']),
+      fraisCredit:            _toDouble(row['frais_credit']),
+      nombreEcheances:        row['nombre_echeances'] as int? ?? 0,
+      totalARembourser:       _toDoubleOrNull(row['total_a_rembourser']),
+      totalRembourse:         _toDouble(row['total_rembourse']),
+      resteARembourser:       _toDoubleOrNull(row['reste_a_rembourser']),
+      statut:                 row['statut'] as String? ?? 'EN_ATTENTE',
+      motifDemande:           row['motif_demande'] as String?,
+      motifRejet:             row['motif_rejet'] as String?,
+      dateDemande:            _parseDate(row['date_demande']),
+      dateValidation:         _parseDate(row['date_validation']),
+      dateDeblocage:          _parseDate(row['date_deblocage']),
+      dateFin:                _parseDate(row['date_fin']),
+      numeroCompte:           row['numero_compte'] as String? ?? '',
+      nomClient:              row['nom_client'] as String?,
+      createdAt:              _parseDate(row['created_at']),
+      echeances:              echeances,
+    );
+  }
 
   static Map<String, dynamic> creditToRow(CreditModel credit) => {
-        'id': credit.id,
-        'numero_credit': credit.referenceCredit,
-        'montant_demande': credit.montantPret,
-        'montant_accorde': credit.montantAccorde,
-        'statut': credit.statut,
-        'taux_interet': 0,
-        'duree_en_mois': credit.nombreEcheances,
-        'client_id': 0,
-        'nom_client': credit.nomClient,
-        'date_demande': credit.dateDemande?.toIso8601String(),
-        'created_at': credit.createdAt?.toIso8601String(),
-        'sync_status': SyncStatus.synced.value,
+        'id':                     credit.id,
+        'reference_credit':       credit.referenceCredit,
+        'montant_demande':        credit.montantPret,
+        'montant_accorde':        credit.montantAccorde,
+        'statut':                 credit.statut,
+        'statut_label':           credit.statutLabel,
+        'type_credit':            credit.typeCredit,
+        'mise_quotidienne':       credit.miseQuotidienne,
+        'frais_credit':           credit.fraisCredit,
+        'nombre_echeances':       credit.nombreEcheances,
+        'taux_interet':           0,
+        'duree_en_mois':          credit.nombreEcheances,
+        'total_a_rembourser':     credit.totalARembourser,
+        'total_rembourse':        credit.totalRembourse,
+        'reste_a_rembourser':     credit.resteARembourser,
+        'progression':            credit.progressionRemboursement,
+        'nombre_echeances_payees': credit.nombreEcheancesPayees,
+        // client_id = 0 si inconnu localement (sera corrigé après sync)
+        'client_id':              0,
+        'nom_client':             credit.nomClient,
+        'numero_compte':          credit.numeroCompte,
+        'motif_demande':          credit.motifDemande,
+        'motif_rejet':            credit.motifRejet,
+        'date_demande':           credit.dateDemande?.toIso8601String(),
+        'date_validation':        credit.dateValidation?.toIso8601String(),
+        'date_deblocage':         credit.dateDeblocage?.toIso8601String(),
+        'date_fin':               credit.dateFin?.toIso8601String(),
+        'echeances_json':         credit.echeances.isEmpty
+            ? null
+            : jsonEncode(credit.echeances
+                .map((e) => {
+                      'id':             e.id,
+                      'numeroEcheance': e.numeroEcheance,
+                      'datePrevue':     e.datePrevue.toIso8601String(),
+                      'datePaiement':   e.datePaiement?.toIso8601String(),
+                      'montantDu':      e.montantDu,
+                      'montantPaye':    e.montantPaye,
+                      'soldeRestant':   e.soldeRestant,
+                      'statut':         e.statut,
+                      'paye':           e.paye,
+                    })
+                .toList()),
+        'created_at':             credit.createdAt?.toIso8601String(),
+        'sync_status':            SyncStatus.synced.value,
       };
+
+  static double _toDouble(dynamic v) =>
+      v == null ? 0.0 : (v as num).toDouble();
+
+  static double? _toDoubleOrNull(dynamic v) =>
+      v == null ? null : (v as num).toDouble();
 
   static DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     return DateTime.tryParse(value.toString());
   }
 }
-

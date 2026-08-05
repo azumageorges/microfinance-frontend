@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../providers/providers.dart';
 
 /// Provider paramétré pour les bénéficiaires d'un client
@@ -292,6 +293,7 @@ class _AddBeneficiaireFormState
       ),
       child: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -308,8 +310,7 @@ class _AddBeneficiaireFormState
                     controller: _prenomCtrl,
                     decoration:
                         const InputDecoration(labelText: 'Prénom *'),
-                    validator: (v) =>
-                        v?.trim().isEmpty == true ? 'Requis' : null,
+                    validator: Validators.personName(label: 'Prénom', isRequired: true),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -318,8 +319,7 @@ class _AddBeneficiaireFormState
                     controller: _nomCtrl,
                     decoration:
                         const InputDecoration(labelText: 'Nom *'),
-                    validator: (v) =>
-                        v?.trim().isEmpty == true ? 'Requis' : null,
+                    validator: Validators.personName(label: 'Nom', isRequired: true),
                   ),
                 ),
               ],
@@ -333,8 +333,10 @@ class _AddBeneficiaireFormState
               ],
               decoration:
                   const InputDecoration(labelText: 'Téléphone *'),
-              validator: (v) =>
-                  v?.trim().isEmpty == true ? 'Requis' : null,
+              validator: Validators.combine([
+                Validators.required(),
+                Validators.phone(isRequired: false),
+              ]),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
@@ -342,7 +344,7 @@ class _AddBeneficiaireFormState
               value: _lien,
               decoration: const InputDecoration(labelText: 'Lien'),
               items: _liens
-                  .map((l) =>
+                  .map<DropdownMenuItem<String>>((l) =>
                       DropdownMenuItem(value: l, child: Text(l)))
                   .toList(),
               onChanged: (v) => setState(() => _lien = v!),
@@ -351,6 +353,8 @@ class _AddBeneficiaireFormState
             TextFormField(
               controller: _adresseCtrl,
               decoration: const InputDecoration(labelText: 'Adresse'),
+              validator: Validators.maxLength(200,
+                  message: 'Adresse : max 200 caractères'),
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),

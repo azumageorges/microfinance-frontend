@@ -12,7 +12,7 @@ class BeneficiaireRepository {
     try {
       final res = await _apiClient.dio
           .get('/api/beneficiaires/client/$clientId');
-      return (res.data['data'] as List)
+      return (res.data['data'] as List<dynamic>)
           .map((e) => BeneficiaireModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {

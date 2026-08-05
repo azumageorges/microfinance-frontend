@@ -16,12 +16,96 @@ class TerrainAccueilScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final clientsAsync = ref.watch(clientsProvider);
+    final isOnlineAsync = ref.watch(isOnlineProvider);
+    final pendingCount = ref.watch(pendingSyncCountProvider);
+
+    // Indicateur de connectivité
+    final isOnline = isOnlineAsync.valueOrNull ?? true;
 
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(clientsProvider),
+      onRefresh: () async {
+        ref.invalidate(clientsProvider);
+        if (isOnline) ref.read(syncServiceProvider).syncPendingChanges();
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 80),
         children: [
+          // ── Bandeau offline ───────────────────────────────────────
+          if (!isOnline)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppTheme.warning.withValues(alpha: 0.4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.wifi_off_rounded,
+                      color: AppTheme.warning, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mode hors ligne — les modifications seront synchronisées dès le retour du réseau.',
+                      style: TextStyle(
+                          fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // ── Badge sync en attente ─────────────────────────────────
+          pendingCount.when(
+            data: (count) => count > 0
+                ? GestureDetector(
+                    onTap: isOnline
+                        ? () => ref
+                            .read(syncServiceProvider)
+                            .syncPendingChanges()
+                        : null,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isOnline
+                                ? Icons.sync_rounded
+                                : Icons.cloud_off_rounded,
+                            color: AppTheme.primary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$count modification(s) en attente de synchronisation${isOnline ? ' — Appuyez pour synchroniser' : ''}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppTheme.primary),
+                            ),
+                          ),
+                          if (isOnline)
+                            const Icon(Icons.chevron_right,
+                                size: 16, color: AppTheme.primary),
+                        ],
+                      ),
+                    ),
+                  )
+                : const SizedBox(),
+            loading: () => const SizedBox(),
+            error: (Object e, StackTrace s) => const SizedBox(),
+          ),
+
           // Bonjour
           Text(
             'Bonjour, ${auth?.prenom ?? ''} 👋',
@@ -41,7 +125,7 @@ class TerrainAccueilScreen extends ConsumerWidget {
           // Stats rapides
           clientsAsync.when(
             loading: () => const LoadingOverlay(),
-            error: (_, _) => const SizedBox(),
+            error: (Object e, StackTrace s) => const SizedBox(),
             data: (clients) {
               final actifs =
                   clients.where((c) => c.statut == 'ACTIF').length;
@@ -164,7 +248,7 @@ class TerrainAccueilScreen extends ConsumerWidget {
               }
               return Column(
                 children: recents
-                    .map((c) => Card(
+                    .map<Widget>((c) => Card(
                           margin:
                               const EdgeInsets.only(bottom: 8),
                           child: ListTile(

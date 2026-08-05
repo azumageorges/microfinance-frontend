@@ -209,6 +209,9 @@ class CreditDetailScreen extends ConsumerWidget {
                       if (credit.dateDemande != null)
                         _Row('Date demande',
                             Formatters.date(credit.dateDemande)),
+                      if (credit.dateDemandeDeblocage != null)
+                        _Row('Date demande déblocage',
+                            Formatters.date(credit.dateDemandeDeblocage)),
                       if (credit.dateDeblocage != null)
                         _Row('Date déblocage',
                             Formatters.date(credit.dateDeblocage)),
@@ -219,6 +222,14 @@ class CreditDetailScreen extends ConsumerWidget {
                       if (credit.motifRejet != null)
                         _Row('Motif rejet', credit.motifRejet!,
                             color: AppTheme.error),
+                      if (credit.motifRejetDeblocage != null)
+                        _Row('Motif rejet déblocage',
+                            credit.motifRejetDeblocage!,
+                            color: AppTheme.error),
+                      if (credit.debloquePar != null)
+                        _Row('Initié par', credit.debloquePar!),
+                      if (credit.deblocageValidePar != null)
+                        _Row('Validé par', credit.deblocageValidePar!),
                     ],
                   ),
                 ),
@@ -286,14 +297,62 @@ class CreditDetailScreen extends ConsumerWidget {
       ]);
     }
 
-    // Débloquer (Caissier, VALIDE)
+    // Demander déblocage (Caissier, VALIDE)
     if (credit.statut == 'VALIDE' && auth?.isCaissier == true) {
       actions.addAll([
         const SizedBox(height: 12),
         ElevatedButton.icon(
-          onPressed: () => _debloquer(context, ref, credit.id),
+          onPressed: () => _demanderDeblocage(context, ref, credit.id),
+          icon: const Icon(Icons.send),
+          label: const Text('Demander déblocage'),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary),
+        ),
+      ]);
+    }
+
+    // Valider déblocage (Gestionnaire, DEBLOCAGE_EN_ATTENTE)
+    if (credit.statut == 'DEBLOCAGE_EN_ATTENTE' && auth?.isGestionnaire == true) {
+      actions.addAll([
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _validerDeblocage(context, ref, credit.id, false),
+                icon: const Icon(Icons.close, color: AppTheme.error),
+                label: const Text('Rejeter',
+                    style: TextStyle(color: AppTheme.error)),
+                style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.error)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _validerDeblocage(context, ref, credit.id, true),
+                icon: const Icon(Icons.check),
+                label: const Text('Approuver'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.success),
+              ),
+            ),
+          ],
+        ),
+      ]);
+    }
+
+    // Exécuter déblocage (Caissier, VALIDE après validation)
+    if (credit.statut == 'VALIDE' && 
+        credit.motifRejetDeblocage == null &&
+        credit.deblocageValidePar != null &&
+        auth?.isCaissier == true) {
+      actions.addAll([
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () => _executerDeblocage(context, ref, credit.id),
           icon: const Icon(Icons.lock_open),
-                label: const Text('Décaisser les fonds'),
+          label: const Text('Décaisser les fonds'),
           style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary),
         ),
@@ -394,21 +453,20 @@ class CreditDetailScreen extends ConsumerWidget {
       ref.invalidate(creditsProvider);
       ref.invalidate(_creditByReferenceProvider(reference));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(approuve ? 'Crédit approuvé ✓' : 'Crédit rejeté'),
-          backgroundColor:
-              approuve ? AppTheme.success : AppTheme.textSecondary,
-        ));
+        if (approuve) {
+          AppSnackBar.success(context, 'Crédit approuvé ✓');
+        } else {
+          AppSnackBar.info(context, 'Crédit rejeté');
+        }
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()), backgroundColor: AppTheme.error));
+        AppSnackBar.error(context, e.toString());
       }
     }
   }
 
-  Future<void> _debloquer(
+  Future<void> _demanderDeblocage(
     BuildContext context,
     WidgetRef ref,
     int creditId,
@@ -416,9 +474,152 @@ class CreditDetailScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Décaisser ce crédit ?'),
+        title: const Text('Demander le déblocage ?'),
         content: const Text(
-            'Les fonds seront remis au client après validation préalable du gestionnaire. Cette action est irréversible.'),
+            'Cette action créera une demande de déblocage qui devra être validée par le gestionnaire.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    try {
+      await ref.read(creditRepositoryProvider).demanderDeblocage(creditId);
+      ref.invalidate(creditsProvider);
+      ref.invalidate(_creditByReferenceProvider(reference));
+      if (context.mounted) {
+        AppSnackBar.success(context, 'Demande de déblocage envoyée ✓');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackBar.error(context, e.toString());
+      }
+    }
+  }
+
+  Future<void> _validerDeblocage(
+    BuildContext context,
+    WidgetRef ref,
+    int creditId,
+    bool approuve,
+  ) async {
+    String? motifRejet;
+
+    if (!approuve) {
+      final motifCtrl = TextEditingController();
+      final formKey = GlobalKey<FormState>();
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Rejeter le déblocage ?'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Le déblocage sera rejeté. Le caissier devra en faire une nouvelle demande.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: motifCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Motif du rejet *',
+                    hintText: 'Expliquez la raison du rejet...',
+                  ),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Le motif est obligatoire' : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(ctx, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+              child: const Text('Confirmer le rejet'),
+            ),
+          ],
+        ),
+      );
+      if (result != true || !context.mounted) return;
+      motifRejet = motifCtrl.text.trim();
+    } else {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Approuver le déblocage ?'),
+          content: const Text(
+              'Le caissier pourra ensuite décaisser les fonds au client.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+              child: const Text('Approuver'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !context.mounted) return;
+    }
+
+    try {
+      await ref.read(creditRepositoryProvider).validerDeblocage(
+            creditId,
+            approuve: approuve,
+            motifRejet: motifRejet,
+          );
+      ref.invalidate(creditsProvider);
+      ref.invalidate(_creditByReferenceProvider(reference));
+      if (context.mounted) {
+        if (approuve) {
+          AppSnackBar.success(context, 'Déblocage approuvé ✓');
+        } else {
+          AppSnackBar.info(context, 'Déblocage rejeté');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackBar.error(context, e.toString());
+      }
+    }
+  }
+
+  Future<void> _executerDeblocage(
+    BuildContext context,
+    WidgetRef ref,
+    int creditId,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Décaisser les fonds ?'),
+        content: const Text(
+            'Les fonds seront crédités sur le compte du client. Cette action est irréversible.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -436,20 +637,15 @@ class CreditDetailScreen extends ConsumerWidget {
     if (ok != true || !context.mounted) return;
 
     try {
-      await ref.read(creditRepositoryProvider).debloquerCredit(creditId);
+      await ref.read(creditRepositoryProvider).executerDeblocage(creditId);
       ref.invalidate(creditsProvider);
       ref.invalidate(_creditByReferenceProvider(reference));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Décaissement effectué'),
-          backgroundColor: AppTheme.success,
-        ));
+        AppSnackBar.success(context, 'Décaissement effectué ✓');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error));
+        AppSnackBar.error(context, e.toString());
       }
     }
   }
@@ -510,38 +706,111 @@ class _EcheancesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Sépare les échéances payées des non-payées pour un meilleur affichage
+    final nonPayees  = echeances.where((e) => !e.paye).toList();
+    final payees     = echeances.where((e) =>  e.paye).toList();
+    final canPay     = (credit.statut == 'EN_COURS' || credit.statut == 'EN_RETARD')
+        && (auth?.isCaissier == true || auth?.isAdmin == true);
+
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── En-tête ──────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Échéancier',
                     style: TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w700)),
-                Text(
-                  '${credit.nombreEcheancesPayees}/${echeances.length} payées',
-                  style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.w600),
+                const Spacer(),
+                // Compteur payées / total
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: credit.nombreEcheancesPayees == echeances.length
+                        ? AppTheme.success.withValues(alpha: 0.12)
+                        : AppTheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${credit.nombreEcheancesPayees}/${echeances.length} payées',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: credit.nombreEcheancesPayees == echeances.length
+                            ? AppTheme.success
+                            : AppTheme.primary),
+                  ),
                 ),
               ],
             ),
           ),
+
+          // ── Info case à cocher (caissier uniquement) ─────────────────
+          if (canPay && nonPayees.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.touch_app_outlined,
+                      size: 14,
+                      color: AppTheme.textSecondary.withValues(alpha: 0.6)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Cochez une échéance pour enregistrer le paiement',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color:
+                            AppTheme.textSecondary.withValues(alpha: 0.7),
+                        fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+            ),
+
           const Divider(height: 1),
-          ...echeances.map((e) => _EcheanceTile(
-                echeance: e,
-                ref: ref,
-                onPaid: onPaid,
-                canPay: (credit.statut == 'EN_COURS' ||
-                        credit.statut == 'EN_RETARD') &&
-                    !e.paye &&
-                    auth?.isCaissier == true,
-              )),
+
+          // ── Échéances non payées ──────────────────────────────────────
+          if (nonPayees.isNotEmpty) ...[
+            ...nonPayees.map<Widget>((e) => _EcheanceTile(
+                  echeance: e,
+                  ref: ref,
+                  onPaid: onPaid,
+                  canPay: canPay,
+                )),
+          ],
+
+          // ── Séparateur si les deux sections sont présentes ───────────
+          if (nonPayees.isNotEmpty && payees.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('Payées',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.success,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+            ),
+
+          // ── Échéances payées ──────────────────────────────────────────
+          if (payees.isNotEmpty)
+            ...payees.map<Widget>((e) => _EcheanceTile(
+                  echeance: e,
+                  ref: ref,
+                  onPaid: onPaid,
+                  canPay: false,
+                )),
         ],
       ),
     );
@@ -550,7 +819,7 @@ class _EcheancesCard extends StatelessWidget {
 
 // ─── Tuile échéance ───────────────────────────────────────────────────────────
 
-class _EcheanceTile extends StatelessWidget {
+class _EcheanceTile extends StatefulWidget {
   final EcheanceModel echeance;
   final WidgetRef ref;
   final bool canPay;
@@ -564,124 +833,268 @@ class _EcheanceTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isRetard = echeance.statut == 'EN_RETARD' ||
-        (!echeance.paye && echeance.datePrevue.isBefore(DateTime.now()));
-    final montantAffiche = echeance.montantDu;
+  State<_EcheanceTile> createState() => _EcheanceTileState();
+}
 
-    return ListTile(
-      dense: true,
-      leading: CircleAvatar(
-        radius: 16,
-        backgroundColor: echeance.paye
-            ? AppTheme.success.withValues(alpha: 0.15)
+class _EcheanceTileState extends State<_EcheanceTile> {
+  bool _processing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = widget.echeance;
+    final isRetard = !e.paye &&
+        (e.statut == 'EN_RETARD' || e.datePrevue.isBefore(DateTime.now()));
+
+    // Couleur selon le statut
+    final Color rowColor;
+    if (e.paye) {
+      rowColor = AppTheme.success;
+    } else if (isRetard) {
+      rowColor = AppTheme.error;
+    } else {
+      rowColor = AppTheme.textSecondary;
+    }
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: e.paye
+            ? AppTheme.success.withValues(alpha: 0.04)
             : (isRetard
-                ? AppTheme.error.withValues(alpha: 0.12)
-                : AppTheme.textSecondary.withValues(alpha: 0.1)),
-        child: Icon(
-          echeance.paye
-              ? Icons.check
-              : (isRetard ? Icons.warning_amber : Icons.schedule),
-          size: 16,
-          color: echeance.paye
-              ? AppTheme.success
-              : (isRetard ? AppTheme.error : AppTheme.textSecondary),
-        ),
+                ? AppTheme.error.withValues(alpha: 0.03)
+                : Colors.transparent),
       ),
-      title: Text(
-        'Échéance ${echeance.numeroEcheance}',
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        '${Formatters.date(echeance.datePrevue)} • ${echeance.statutLabel}'
-        '${echeance.soldeRestant != null ? ' • Reste ${Formatters.currency(echeance.soldeRestant)}' : ''}',
-        style: TextStyle(
-          fontSize: 11,
-          color: isRetard && !echeance.paye
-              ? AppTheme.error
-              : AppTheme.textSecondary,
-        ),
-      ),
-      // Montant TOUJOURS visible + bouton Payer si canPay
-      trailing: canPay
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  Formatters.currency(montantAffiche),
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary),
+      child: ListTile(
+        dense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+
+        // ── Case à cocher ──────────────────────────────────────────────
+        leading: _processing
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppTheme.primary,
                 ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () => _confirmerPaiement(context),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    minimumSize: Size.zero,
-                  ),
-                  child: const Text('Payer'),
+              )
+            : Checkbox(
+                value: e.paye,
+                tristate: false,
+                activeColor: AppTheme.success,
+                checkColor: Colors.white,
+                side: BorderSide(
+                  color: e.paye
+                      ? AppTheme.success
+                      : (isRetard ? AppTheme.error : AppTheme.textSecondary),
+                  width: 2,
                 ),
-              ],
-            )
-          : Text(
-              Formatters.currency(montantAffiche),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4)),
+                onChanged: widget.canPay && !e.paye
+                    ? (_) => _confirmerPaiement(context)
+                    : null,
+              ),
+
+        // ── Numéro + date ──────────────────────────────────────────────
+        title: Row(
+          children: [
+            Text(
+              'Échéance ${e.numeroEcheance}',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: echeance.paye
-                    ? AppTheme.success
-                    : (isRetard ? AppTheme.error : AppTheme.textPrimary),
+                color: e.paye ? AppTheme.success : AppTheme.textPrimary,
+                decoration: e.paye ? TextDecoration.lineThrough : null,
+                decorationColor: AppTheme.success,
               ),
             ),
+            if (isRetard) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text('En retard',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.error,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ],
+        ),
+
+        // ── Date + statut ──────────────────────────────────────────────
+        subtitle: Text(
+          e.paye && e.datePaiement != null
+              ? 'Payée le ${Formatters.date(e.datePaiement)} • ${Formatters.currency(e.montantDu)}'
+              : '${Formatters.date(e.datePrevue)} • ${e.statutLabel}',
+          style: TextStyle(
+            fontSize: 11,
+            color: isRetard ? AppTheme.error : AppTheme.textSecondary,
+          ),
+        ),
+
+        // ── Montant + solde restant ────────────────────────────────────
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              Formatters.currency(e.montantDu),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: rowColor,
+              ),
+            ),
+            if (e.soldeRestant != null && !e.paye) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Reste ${Formatters.currency(e.soldeRestant)}',
+                style: const TextStyle(
+                    fontSize: 10, color: AppTheme.textSecondary),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
   Future<void> _confirmerPaiement(BuildContext context) async {
+    final e = widget.echeance;
+
+    // Dialog de confirmation avec récapitulatif clair
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer le paiement'),
-        content: Text(
-          'Enregistrer le remboursement de l\'échéance ${echeance.numeroEcheance} '
-          '(${Formatters.currency(echeance.montantDu)}) ?',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.check_circle_outline,
+                  color: AppTheme.success, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Text('Valider le paiement',
+                style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Récapitulatif
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                children: [
+                  _DialogRow(
+                      label: 'Échéance',
+                      value: '${e.numeroEcheance}'),
+                  const SizedBox(height: 4),
+                  _DialogRow(
+                      label: 'Date prévue',
+                      value: Formatters.date(e.datePrevue)),
+                  const SizedBox(height: 4),
+                  _DialogRow(
+                      label: 'Montant',
+                      value: Formatters.currency(e.montantDu),
+                      valueColor: AppTheme.success),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Le montant sera prélevé sur le compte épargne du client. '
+              'Cette action est irréversible.',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                  height: 1.4),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Annuler'),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success),
-            child: const Text('Confirmer'),
+              backgroundColor: AppTheme.success,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.check, size: 18),
+            label: const Text('Confirmer le paiement'),
           ),
         ],
       ),
     );
     if (ok != true || !context.mounted) return;
 
+    setState(() => _processing = true);
     try {
-      await ref
+      await widget.ref
           .read(creditRepositoryProvider)
-          .rembourserEcheance(echeance.id);
-      ref.invalidate(creditsProvider);
-      onPaid();
+          .rembourserEcheance(e.id);
+      widget.ref.invalidate(creditsProvider);
+      widget.onPaid();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Échéance remboursée ✓'),
-          backgroundColor: AppTheme.success,
-        ));
+        AppSnackBar.success(
+            context, 'Échéance ${e.numeroEcheance} remboursée ✓');
       }
-    } catch (e) {
+    } catch (err) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error));
+        AppSnackBar.error(context, err.toString());
       }
+    } finally {
+      if (mounted) setState(() => _processing = false);
     }
+  }
+}
+
+// ─── Ligne du dialog de confirmation ─────────────────────────────────────────
+
+class _DialogRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _DialogRow({required this.label, required this.value, this.valueColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12, color: AppTheme.textSecondary)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: valueColor ?? AppTheme.textPrimary)),
+      ],
+    );
   }
 }

@@ -38,6 +38,17 @@ class TransactionLocalStore {
     return rows.map(LocalMappers.transactionFromRow).toList();
   }
 
+  Future<TransactionModel?> getById(int id) async {
+    final rows = await _database.db.query(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return LocalMappers.transactionFromRow(rows.first);
+  }
+
   Future<void> upsert(
     TransactionModel transaction, {
     SyncStatus syncStatus = SyncStatus.synced,

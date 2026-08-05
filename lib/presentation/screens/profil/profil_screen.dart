@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../providers/providers.dart';
 
 class ProfilScreen extends ConsumerWidget {
@@ -301,6 +302,7 @@ class _ChangePasswordSheetState
       ),
       child: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -343,8 +345,7 @@ class _ChangePasswordSheetState
                         setState(() => _obscureAncien = !_obscureAncien),
                   ),
                 ),
-                validator: (v) =>
-                    v?.isEmpty == true ? 'Champ requis' : null,
+                validator: Validators.required(),
               ),
               const SizedBox(height: 12),
 
@@ -363,11 +364,7 @@ class _ChangePasswordSheetState
                         setState(() => _obscureNouveau = !_obscureNouveau),
                   ),
                 ),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Champ requis';
-                  if (v.length < 8) return 'Minimum 8 caractères';
-                  return null;
-                },
+                validator: Validators.strongPassword(isRequired: true),
               ),
               const SizedBox(height: 12),
 
@@ -386,12 +383,10 @@ class _ChangePasswordSheetState
                         setState(() => _obscureConfirm = !_obscureConfirm),
                   ),
                 ),
-                validator: (v) {
-                  if (v != _nouveauCtrl.text) {
-                    return 'Les mots de passe ne correspondent pas';
-                  }
-                  return null;
-                },
+                validator: Validators.combine([
+                  Validators.required(),
+                  Validators.sameAs(_nouveauCtrl),
+                ]),
               ),
 
               if (_error != null) ...[

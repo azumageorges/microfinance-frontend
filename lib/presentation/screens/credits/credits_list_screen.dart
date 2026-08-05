@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/validators.dart';
 import '../../../data/models/client_model.dart';
 import '../../../data/models/compte_model.dart';
 import '../../../providers/providers.dart';
@@ -37,6 +39,20 @@ class _CreditsListScreenState extends ConsumerState<CreditsListScreen> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    // Écouter les notifications WebSocket pour rafraîchir automatiquement
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(webSocketServiceProvider).notifications.listen((notification) {
+        if (notification.type.startsWith('CREDIT') || notification.type == 'INSTALLMENT_PAID') {
+          ref.invalidate(creditsProvider);
+          ref.invalidate(dashboardProvider);
+        }
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final creditsAsync = ref.watch(creditsProvider);
 
@@ -66,7 +82,7 @@ class _CreditsListScreenState extends ConsumerState<CreditsListScreen> {
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              children: _statuts.map((s) {
+              children: _statuts.map<Widget>((s) {
                 final sel = _filterStatut == s;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -399,12 +415,7 @@ class _DemandeCreditSheetState extends ConsumerState<_DemandeCreditSheet> {
       ref.invalidate(creditsProvider);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Demande de crédit soumise ✓'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        AppSnackBar.success(context, 'Demande de crédit soumise ✓');
       }
     } catch (e) {
       setState(() => _error = e.toString());
@@ -463,7 +474,7 @@ class _StepClientState extends ConsumerState<_StepClient> {
                     style: TextStyle(color: AppTheme.textSecondary)),
               )
             else
-              ...filtered.map((c) => ListTile(
+              ...filtered.map<Widget>((c) => ListTile(
                     onTap: () => widget.onSelected(c),
                     contentPadding: const EdgeInsets.symmetric(vertical: 2),
                     leading: CircleAvatar(
@@ -531,9 +542,7 @@ class _StepCompteState extends ConsumerState<_StepCompte> {
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Erreur : $e'),
-            backgroundColor: AppTheme.error));
+        AppSnackBar.error(context, 'Erreur : $e');
       }
     } finally {
       if (mounted) setState(() => _creating = false);
@@ -608,7 +617,7 @@ class _StepCompteState extends ConsumerState<_StepCompte> {
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textSecondary.withValues(alpha: 0.8))),
               const SizedBox(height: 8),
-              ...comptesCredit.map((c) => _CompteCreditTile(
+              ...comptesCredit.map<Widget>((c) => _CompteCreditTile(
                     compte: c,
                     selected: _localSelected?.id == c.id,
                     onTap: () {
@@ -686,6 +695,7 @@ class _StepParametres extends StatelessWidget {
 
     return Form(
       key: formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -716,22 +726,27 @@ class _StepParametres extends StatelessWidget {
                 onChanged();
               }
             },
+            validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
           ),
           const SizedBox(height: 12),
 
           TextFormField(
             controller: miseCtrl,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(
               labelText: 'Mise quotidienne (FCFA) *',
               prefixIcon: Icon(Icons.payments_outlined),
             ),
             onChanged: (_) => onChanged(),
-            validator: (v) {
-              if (v?.trim().isEmpty == true) return 'Requis';
-              if ((double.tryParse(v!) ?? 0) <= 0) return 'Montant invalide';
-              return null;
-            },
+            validator: Validators.combine([
+              Validators.required(),
+              Validators.positiveNumber(
+                isRequired: false,
+                min: 0,
+                messageInvalid: 'Montant invalide',
+              ),
+            ]),
           ),
           const SizedBox(height: 12),
 
@@ -743,6 +758,8 @@ class _StepParametres extends StatelessWidget {
               labelText: 'Motif de la demande',
               prefixIcon: Icon(Icons.description_outlined),
             ),
+            validator: Validators.maxLength(200,
+                message: 'Motif : max 200 caractères'),
           ),
 
           if (montantPret != null && frais != null && total != null) ...[
@@ -803,26 +820,7 @@ class _StepParametres extends StatelessWidget {
           // Erreur
           if (error != null) ...[
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline,
-                      color: AppTheme.error, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(error!,
-                        style: const TextStyle(
-                            color: AppTheme.error, fontSize: 12)),
-                  ),
-                ],
-              ),
-            ),
+            InlineError(message: error!),
           ],
 
           const SizedBox(height: 24),

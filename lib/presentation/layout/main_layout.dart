@@ -103,7 +103,7 @@ class MainLayout extends ConsumerWidget {
         selectedIndex: currentIndex < 0 ? 0 : currentIndex,
         onDestinationSelected: (i) => context.go(items[i].path),
         destinations: items
-            .map((item) => NavigationDestination(
+            .map<NavigationDestination>((item) => NavigationDestination(
                   icon: Icon(item.icon),
                   selectedIcon: Icon(item.activeIcon),
                   label: item.label,
@@ -165,7 +165,7 @@ class _MobileDrawer extends ConsumerWidget {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  ...items.map((item) {
+                  ...items.map<Widget>((item) {
                     final isActive = currentPath.startsWith(item.path);
                     return ListTile(
                       leading: Icon(
@@ -288,7 +288,7 @@ class _SideNav extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               children: [
-                ...items.map((item) {
+                ...items.map<Widget>((item) {
                   final isActive = currentPath.startsWith(item.path);
                   return _SideNavItem(item: item, isActive: isActive);
                 }),

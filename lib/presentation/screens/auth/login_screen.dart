@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/validators.dart';
 import '../../../providers/providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -203,6 +204,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     padding: const EdgeInsets.all(24),
                     child: Form(
                       key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -224,12 +226,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               hintText: 'exemple@microfinance.com',
                               prefixIcon: Icon(Icons.email_outlined),
                             ),
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
-                                return 'Email requis';
-                              }
-                              return null;
-                            },
+                            validator: Validators.email(isRequired: true),
                           ),
                           const SizedBox(height: 16),
 
@@ -261,12 +258,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     setState(() => _obscure = !_obscure),
                               ),
                             ),
-                            validator: (v) {
-                              if (v == null || v.isEmpty) {
-                                return 'Mot de passe requis';
-                              }
-                              return null;
-                            },
+                            validator: Validators.required(
+                                message: 'Mot de passe requis'),
                           ),
 
                           if (_error != null) ...[

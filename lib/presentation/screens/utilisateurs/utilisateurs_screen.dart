@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../data/models/utilisateur_model.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
@@ -154,25 +156,16 @@ class _UserCard extends StatelessWidget {
                         .toggleActif(user.id);
                     ref.invalidate(utilisateursProvider);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            user.actif
-                                ? 'Utilisateur désactivé'
-                                : 'Utilisateur activé',
-                          ),
-                          backgroundColor: AppTheme.success,
-                        ),
+                      AppSnackBar.success(
+                        context,
+                        user.actif
+                            ? 'Utilisateur désactivé'
+                            : 'Utilisateur activé',
                       );
                     }
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(e.toString()),
-                          backgroundColor: AppTheme.error,
-                        ),
-                      );
+                      AppSnackBar.error(context, e.toString());
                     }
                   }
                 } else if (action == 'modifier') {
@@ -265,7 +258,6 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
   String? _error;
 
   static const _roles = {
-    'ADMIN': 'Administrateur',
     'AGENT_TERRAIN': 'Agent terrain',
     'GESTIONNAIRE_COMPTE': 'Gestionnaire de compte',
     'CAISSIER': 'Caissier',
@@ -317,6 +309,7 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
       ),
       child: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -333,8 +326,8 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
                     child: TextFormField(
                       controller: _prenomCtrl,
                       decoration: const InputDecoration(labelText: 'Prénom *'),
-                      validator: (v) =>
-                          v?.trim().isEmpty == true ? 'Requis' : null,
+                      validator: Validators.personName(
+                          label: 'Prénom', isRequired: true),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -342,8 +335,8 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
                     child: TextFormField(
                       controller: _nomCtrl,
                       decoration: const InputDecoration(labelText: 'Nom *'),
-                      validator: (v) =>
-                          v?.trim().isEmpty == true ? 'Requis' : null,
+                      validator: Validators.personName(
+                          label: 'Nom', isRequired: true),
                     ),
                   ),
                 ],
@@ -353,17 +346,15 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Email *'),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Requis';
-                  if (!v.contains('@')) return 'Email invalide';
-                  return null;
-                },
+                validator: Validators.email(isRequired: true),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _telCtrl,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(labelText: 'Téléphone'),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: Validators.phone(isRequired: false),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -384,6 +375,8 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
                 obscureText: _obscure,
                 decoration: InputDecoration(
                   labelText: 'Mot de passe *',
+                  helperText: 'Min. 8 caractères avec majuscule, minuscule et chiffre',
+                  helperMaxLines: 2,
                   suffixIcon: IconButton(
                     icon: Icon(_obscure
                         ? Icons.visibility_outlined
@@ -391,16 +384,11 @@ class _CreateUserSheetState extends ConsumerState<_CreateUserSheet> {
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
-                validator: (v) {
-                  if (v == null || v.length < 8) {
-                    return 'Minimum 8 caractères';
-                  }
-                  return null;
-                },
+                validator: Validators.strongPassword(isRequired: true),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(_error!, style: const TextStyle(color: AppTheme.error)),
+                InlineError(message: _error!),
               ],
               const SizedBox(height: 20),
               ElevatedButton(
@@ -446,7 +434,6 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
   String? _error;
 
   static const _roles = {
-    'ADMIN':               'Administrateur',
     'AGENT_TERRAIN':       'Agent terrain',
     'GESTIONNAIRE_COMPTE': 'Gestionnaire de compte',
     'CAISSIER':            'Caissier',
@@ -458,7 +445,9 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
     _nomCtrl    = TextEditingController(text: widget.user.nom);
     _prenomCtrl = TextEditingController(text: widget.user.prenom);
     _telCtrl    = TextEditingController(text: widget.user.telephone ?? '');
-    _role       = widget.user.role;
+    // Empêcher la modification du rôle ADMIN
+    _role       = widget.user.role == 'ADMIN' ? widget.user.role : 
+                  (_roles.containsKey(widget.user.role) ? widget.user.role : 'AGENT_TERRAIN');
   }
 
   @override
@@ -490,12 +479,7 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
       ref.invalidate(utilisateursProvider);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Utilisateur modifié avec succès'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        AppSnackBar.success(context, 'Utilisateur modifié avec succès');
       }
     } catch (e) {
       setState(() => _error = e.toString());
@@ -513,6 +497,7 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
       ),
       child: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -559,8 +544,8 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
                     child: TextFormField(
                       controller: _prenomCtrl,
                       decoration: const InputDecoration(labelText: 'Prénom'),
-                      validator: (v) =>
-                          v?.trim().isEmpty == true ? 'Requis' : null,
+                      validator: Validators.personName(
+                          label: 'Prénom', isRequired: true),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -568,8 +553,8 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
                     child: TextFormField(
                       controller: _nomCtrl,
                       decoration: const InputDecoration(labelText: 'Nom'),
-                      validator: (v) =>
-                          v?.trim().isEmpty == true ? 'Requis' : null,
+                      validator: Validators.personName(
+                          label: 'Nom', isRequired: true),
                     ),
                   ),
                 ],
@@ -580,10 +565,12 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
               TextFormField(
                 controller: _telCtrl,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
                   labelText: 'Téléphone',
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
+                validator: Validators.phone(isRequired: false),
               ),
               const SizedBox(height: 12),
 
@@ -603,27 +590,7 @@ class _EditUserSheetState extends ConsumerState<_EditUserSheet> {
 
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.error.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: AppTheme.error.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline,
-                          color: AppTheme.error, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(_error!,
-                            style:
-                                const TextStyle(color: AppTheme.error, fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
+                InlineError(message: _error!),
               ],
               const SizedBox(height: 20),
 

@@ -4,16 +4,19 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/carte_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../data/models/client_model.dart';
+import '../../../data/models/compte_model.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/client_avatar.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/status_badge.dart';
 
-final _terrainClientProvider = FutureProvider.family<dynamic, int>(
+final _terrainClientProvider = FutureProvider.family<ClientModel, int>(
   (ref, id) => ref.watch(clientRepositoryProvider).getClientById(id),
 );
 
-final _terrainClientComptesProvider = FutureProvider.family<dynamic, int>(
+final _terrainClientComptesProvider =
+    FutureProvider.family<List<CompteModel>, int>(
   (ref, id) =>
       ref.watch(compteRepositoryProvider).getComptesByClient(id),
 );
@@ -191,7 +194,7 @@ class TerrainClientDetailScreen extends ConsumerWidget {
                       }
                       return Column(
                         children: comptes
-                            .map((c) => ListTile(
+                            .map<Widget>((c) => ListTile(
                                   dense: true,
                                   leading: Container(
                                     width: 34,

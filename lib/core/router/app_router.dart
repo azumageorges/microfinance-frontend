@@ -20,6 +20,7 @@ import '../../presentation/screens/comptes/comptes_list_screen.dart';
 import '../../presentation/screens/comptes/compte_detail_screen.dart';
 import '../../presentation/screens/comptes/compte_form_screen.dart';
 import '../../presentation/screens/transactions/transactions_screen.dart';
+import '../../presentation/screens/transactions/transaction_detail_screen.dart';
 import '../../presentation/screens/transactions/operation_screen.dart';
 import '../../presentation/screens/credits/credits_list_screen.dart';
 import '../../presentation/screens/credits/credit_detail_screen.dart';
@@ -215,6 +216,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'transfert',
                 builder: (ctx, state) =>
                     const OperationScreen(type: 'transfert'),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (ctx, state) => TransactionDetailScreen(
+                  transactionId: int.parse(state.pathParameters['id']!),
+                ),
               ),
             ],
           ),

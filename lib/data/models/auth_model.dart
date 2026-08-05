@@ -52,7 +52,10 @@ class AuthResponse {
   bool get canAccessUtilisateurs => isAdmin;
   bool get canManageComptes => isAdmin || isGestionnaire;
   bool get canAccessTransactions => isAdmin || isGestionnaire || isCaissier;
-  bool get canDoTransactions => isCaissier;
+  bool get canDoTransactions => isAdmin || isGestionnaire || isCaissier;
+  bool get canValidateSensitiveTransactions => isAdmin || isGestionnaire;
+  bool get canExecuteSensitiveTransactions =>
+      isAdmin || isGestionnaire || isCaissier;
   bool get canValidateCredits => isGestionnaire;
   bool get canDebloquerCredits => isCaissier;
 

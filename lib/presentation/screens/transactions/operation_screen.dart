@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/app_app_bar.dart';
+import '../../widgets/loading_overlay.dart';
 
 class OperationScreen extends ConsumerStatefulWidget {
   final String type; // 'depot' | 'retrait' | 'transfert'
@@ -72,13 +74,14 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
 
+    final montant = double.parse(_montantCtrl.text.trim());
     final data = {
-      'numeroCompte': _compteCtrl.text.trim(),
-      'montant': double.parse(_montantCtrl.text.trim()),
+      'numeroCompte': _compteCtrl.text.trim().toUpperCase(),
+      'montant': montant,
       if (_motifCtrl.text.isNotEmpty) 'motif': _motifCtrl.text.trim(),
       if (widget.type == 'transfert' &&
           _compteDestCtrl.text.isNotEmpty)
-        'numeroCompteDestination': _compteDestCtrl.text.trim(),
+        'numeroCompteDestination': _compteDestCtrl.text.trim().toUpperCase(),
     };
 
     try {
@@ -93,20 +96,16 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
 
       ref.invalidate(transactionsProvider);
       ref.invalidate(comptesProvider);
+      ref.invalidate(dashboardProvider);
 
       if (mounted) {
         final successMessage = switch (widget.type) {
-          'depot' => 'Dépôt effectué avec succès',
-          'retrait' => 'Demande de retrait envoyée au gestionnaire',
-          'transfert' => 'Demande de transfert envoyée au gestionnaire',
-          _ => 'Opération enregistrée',
+          'depot'    => 'Dépôt effectué avec succès',
+          'retrait'  => 'Demande de retrait envoyée au gestionnaire',
+          'transfert'=> 'Demande de transfert envoyée au gestionnaire',
+          _          => 'Opération enregistrée',
         };
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(successMessage),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        AppSnackBar.success(context, successMessage);
         context.pop();
       }
     } catch (e) {
@@ -144,6 +143,7 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
                     padding: const EdgeInsets.all(20),
                     child: Form(
                       key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -157,14 +157,16 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
                             controller: _compteCtrl,
                             textCapitalization:
                                 TextCapitalization.characters,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[A-Za-z0-9]')),
+                            ],
                             decoration: const InputDecoration(
-                              hintText: 'Ex: CPT-00001',
+                              hintText: 'Ex: EPC000000001',
                               prefixIcon: Icon(
                                   Icons.account_balance_wallet_outlined),
                             ),
-                            validator: (v) => v?.trim().isEmpty == true
-                                ? 'Requis'
-                                : null,
+                            validator: Validators.numeroCompte(isRequired: true),
                           ),
 
                           // Compte destination (transfert uniquement)
@@ -179,15 +181,16 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
                               controller: _compteDestCtrl,
                               textCapitalization:
                                   TextCapitalization.characters,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[A-Za-z0-9]')),
+                              ],
                               decoration: const InputDecoration(
-                                hintText: 'Ex: CPT-00002',
+                                hintText: 'Ex: EPC000000002',
                                 prefixIcon:
                                     Icon(Icons.send_outlined),
                               ),
-                              validator: (v) =>
-                                  v?.trim().isEmpty == true
-                                      ? 'Requis'
-                                      : null,
+                              validator: Validators.numeroCompte(isRequired: true),
                             ),
                           ],
 
@@ -241,20 +244,7 @@ class _OperationScreenState extends ConsumerState<OperationScreen> {
 
                           if (_error != null) ...[
                             const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppTheme.error
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: AppTheme.error
-                                        .withValues(alpha: 0.3)),
-                              ),
-                              child: Text(_error!,
-                                  style: const TextStyle(
-                                      color: AppTheme.error)),
-                            ),
+                            InlineError(message: _error!),
                           ],
 
                           const SizedBox(height: 20),

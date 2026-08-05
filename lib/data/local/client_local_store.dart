@@ -99,4 +99,8 @@ class ClientLocalStore {
     ''');
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+  Future<void> delete(int id) async {
+    await _database.db.delete('clients', where: 'id = ?', whereArgs: [id]);
+  }
 }

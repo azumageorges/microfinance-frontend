@@ -156,7 +156,7 @@ class _RechercheScreenState extends ConsumerState<RechercheScreen> {
         if (matchClients.isNotEmpty) ...[
           _SectionHeader(label: 'Clients', count: matchClients.length),
           const SizedBox(height: 8),
-          ...matchClients.take(_limitClients).map((c) => Card(
+          ...matchClients.take(_limitClients).map<Widget>((c) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   onTap: () => context.push('/clients/${c.id}'),
@@ -181,7 +181,7 @@ class _RechercheScreenState extends ConsumerState<RechercheScreen> {
         if (matchComptes.isNotEmpty) ...[
           _SectionHeader(label: 'Comptes', count: matchComptes.length),
           const SizedBox(height: 8),
-          ...matchComptes.take(_limitComptes).map((c) => Card(
+          ...matchComptes.take(_limitComptes).map<Widget>((c) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   onTap: () => context.push('/comptes/${c.numeroCompte}'),
@@ -214,7 +214,7 @@ class _RechercheScreenState extends ConsumerState<RechercheScreen> {
         if (matchCredits.isNotEmpty) ...[
           _SectionHeader(label: 'Crédits', count: matchCredits.length),
           const SizedBox(height: 8),
-          ...matchCredits.take(_limitCredits).map((c) => Card(
+          ...matchCredits.take(_limitCredits).map<Widget>((c) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   onTap: () =>

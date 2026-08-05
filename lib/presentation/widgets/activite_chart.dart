@@ -12,103 +12,97 @@ class ActiviteChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Activité du jour',
-              style:
-                  TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Dépôts, retraits et transferts (30j)',
-              style:
-                  TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 160,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _maxY,
-                  barTouchData: BarTouchData(
-                    touchTooltipData: BarTouchTooltipData(
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final labels = ['Dépôts', 'Retraits', 'Transferts'];
-                        return BarTooltipItem(
-                          '${labels[groupIndex]}\n${Formatters.currency(rod.toY)}',
-                          const TextStyle(
-                              color: Colors.white, fontSize: 12),
-                        );
-                      },
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          const titles = ['Dépôts', 'Retraits', 'Transf.'];
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              titles[value.toInt()],
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textSecondary),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (_) => const FlLine(
-                      color: AppTheme.border,
-                      strokeWidth: 1,
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: [
-                    _bar(0, dashboard.totalDepotsJour, AppTheme.success),
-                    _bar(1, dashboard.totalRetraitsJour, AppTheme.error),
-                    _bar(2, dashboard.totalTransferts30j, AppTheme.primary),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Activité du jour',
+          style:
+              TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Dépôts, retraits et transferts (30j)',
+          style:
+              TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: _maxY,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final labels = ['Dépôts', 'Retraits', 'Transferts'];
+                    return BarTooltipItem(
+                      '${labels[groupIndex]}\n${Formatters.currency(rod.toY)}',
+                      const TextStyle(
+                          color: Colors.white, fontSize: 12),
+                    );
+                  },
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            // Légende
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _Legend(color: AppTheme.success, label: 'Dépôts'),
-                const SizedBox(width: 16),
-                _Legend(color: AppTheme.error, label: 'Retraits'),
-                const SizedBox(width: 16),
-                _Legend(color: AppTheme.primary, label: 'Transferts 30j'),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      const titles = ['Dépôts', 'Retraits', 'Transf.'];
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          titles[value.toInt()],
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textSecondary),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => const FlLine(
+                  color: AppTheme.border,
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: [
+                _bar(0, dashboard.totalDepotsJour, AppTheme.success),
+                _bar(1, dashboard.totalRetraitsJour, AppTheme.error),
+                _bar(2, dashboard.totalTransferts30j, AppTheme.primary),
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Légende
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _Legend(color: AppTheme.success, label: 'Dépôts'),
+            const SizedBox(width: 12),
+            _Legend(color: AppTheme.error, label: 'Retraits'),
+            const SizedBox(width: 12),
+            _Legend(color: AppTheme.primary, label: 'Transferts 30j'),
           ],
         ),
-      ),
+      ],
     );
   }
 

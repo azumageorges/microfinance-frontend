@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,19 +13,29 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
 
-  final database = await AppDatabase.open();
-
-  runApp(
-    ProviderScope(
-      overrides: [
-        appDatabaseProvider.overrideWithValue(database),
-      ],
-      child: const _AppBootstrap(),
-    ),
-  );
+  // SQLite est uniquement utilisé sur mobile pour le mode offline
+  // Sur le web, toutes les données viennent directement de PostgreSQL via l'API
+  if (!kIsWeb) {
+    final database = await AppDatabase.open();
+    runApp(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+        ],
+        child: const _AppBootstrap(),
+      ),
+    );
+  } else {
+    // Sur le web, pas de SQLite - providers utiliseront les repositories Web
+    runApp(
+      const ProviderScope(
+        child: _AppBootstrap(),
+      ),
+    );
+  }
 }
 
-/// Démarre le service de synchronisation puis affiche l'application.
+/// Démarre le service de synchronisation (mobile uniquement) puis affiche l'application.
 class _AppBootstrap extends ConsumerStatefulWidget {
   const _AppBootstrap();
 
@@ -36,11 +47,14 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final syncService = ref.read(syncServiceProvider);
-      syncService.startListening();
-      syncService.syncPendingChanges();
-    });
+    // La synchronisation offline est uniquement pour mobile
+    if (!kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final syncService = ref.read(syncServiceProvider);
+        syncService.startListening();
+        syncService.syncPendingChanges();
+      });
+    }
   }
 
   @override

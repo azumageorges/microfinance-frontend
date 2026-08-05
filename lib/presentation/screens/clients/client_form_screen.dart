@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/loading_overlay.dart';
@@ -93,26 +95,37 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
 
-    final data = {
+    final data = <String, dynamic>{
       'nom': _nomCtrl.text.trim(),
       'prenom': _prenomCtrl.text.trim(),
       'telephone': _telCtrl.text.trim(),
-      if (_dateNaissance != null)
-        'dateNaissance':
-            '${_dateNaissance!.year.toString().padLeft(4, '0')}-'
-            '${_dateNaissance!.month.toString().padLeft(2, '0')}-'
-            '${_dateNaissance!.day.toString().padLeft(2, '0')}',
-      if (_emailCtrl.text.isNotEmpty) 'email': _emailCtrl.text.trim(),
-      if (_adresseCtrl.text.isNotEmpty) 'adresse': _adresseCtrl.text.trim(),
-      if (_professionCtrl.text.isNotEmpty)
-        'profession': _professionCtrl.text.trim(),
-      if (_lieuNaissCtrl.text.isNotEmpty)
-        'lieuNaissance': _lieuNaissCtrl.text.trim(),
-      if (_typePieceCtrl.text.isNotEmpty)
-        'typePieceIdentite': _typePieceCtrl.text.trim(),
-      if (_numPieceCtrl.text.isNotEmpty)
-        'numeroPieceIdentite': _numPieceCtrl.text.trim(),
     };
+
+    // Ajouter uniquement les champs non vides
+    if (_dateNaissance != null) {
+      data['dateNaissance'] =
+          '${_dateNaissance!.year.toString().padLeft(4, '0')}-'
+          '${_dateNaissance!.month.toString().padLeft(2, '0')}-'
+          '${_dateNaissance!.day.toString().padLeft(2, '0')}';
+    }
+    if (_emailCtrl.text.trim().isNotEmpty) {
+      data['email'] = _emailCtrl.text.trim();
+    }
+    if (_adresseCtrl.text.trim().isNotEmpty) {
+      data['adresse'] = _adresseCtrl.text.trim();
+    }
+    if (_professionCtrl.text.trim().isNotEmpty) {
+      data['profession'] = _professionCtrl.text.trim();
+    }
+    if (_lieuNaissCtrl.text.trim().isNotEmpty) {
+      data['lieuNaissance'] = _lieuNaissCtrl.text.trim();
+    }
+    if (_typePieceCtrl.text.trim().isNotEmpty) {
+      data['typePieceIdentite'] = _typePieceCtrl.text.trim();
+    }
+    if (_numPieceCtrl.text.trim().isNotEmpty) {
+      data['numeroPieceIdentite'] = _numPieceCtrl.text.trim();
+    }
 
     try {
       if (isEdit) {
@@ -138,17 +151,36 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
         final client = await ref
             .read(clientRepositoryProvider)
             .createClient(data);
-        // Upload photo si sélectionnée après création
-        if (_photoBytes != null && _photoFileName != null) {
+        // Upload photo si sélectionnée après création (seulement si online)
+        if (_photoBytes != null && _photoFileName != null && client.id > 0) {
           await ref.read(fichierRepositoryProvider).uploadPhotoClient(
               client.id, _photoBytes!, _photoFileName!);
         }
         ref.invalidate(clientsProvider);
         if (mounted) {
+          // Message différent selon mode online/offline
+          final isOffline = client.id < 0; // ID négatif = créé localement
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Client créé avec succès'),
-              backgroundColor: AppTheme.success,
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    isOffline ? Icons.cloud_off_rounded : Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isOffline
+                          ? 'Client sauvegardé localement — sera synchronisé dès le retour du réseau'
+                          : 'Client créé avec succès',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: isOffline ? AppTheme.warning : AppTheme.success,
+              duration: Duration(seconds: isOffline ? 5 : 3),
             ),
           );
           if (kIsWeb) {
@@ -175,6 +207,7 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
       ),
       body: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -184,16 +217,14 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
                 label: 'Prénom',
                 controller: _prenomCtrl,
                 required: true,
-                validator: (v) =>
-                    v?.trim().isEmpty == true ? 'Champ requis' : null,
+                validator: Validators.personName(label: 'Prénom'),
               ),
               const SizedBox(height: 12),
               AppTextField(
                 label: 'Nom',
                 controller: _nomCtrl,
                 required: true,
-                validator: (v) =>
-                    v?.trim().isEmpty == true ? 'Champ requis' : null,
+                validator: Validators.personName(label: 'Nom'),
               ),
               const SizedBox(height: 12),
               // Date de naissance — date picker natif
@@ -206,6 +237,8 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
               AppTextField(
                 label: 'Lieu de naissance',
                 controller: _lieuNaissCtrl,
+                validator: Validators.maxLength(80,
+                    message: 'Lieu de naissance : max 80 caractères'),
               ),
             ]),
             const SizedBox(height: 16),
@@ -246,8 +279,8 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
                 required: true,
                 keyboardType: TextInputType.phone,
                 prefixIcon: const Icon(Icons.phone_outlined),
-                validator: (v) =>
-                    v?.trim().isEmpty == true ? 'Champ requis' : null,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: Validators.phone(isRequired: false),
               ),
               const SizedBox(height: 12),
               AppTextField(
@@ -255,6 +288,7 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 prefixIcon: const Icon(Icons.email_outlined),
+                validator: Validators.email(isRequired: false),
               ),
               const SizedBox(height: 12),
               AppTextField(
@@ -262,12 +296,16 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
                 controller: _adresseCtrl,
                 maxLines: 2,
                 prefixIcon: const Icon(Icons.location_on_outlined),
+                validator: Validators.maxLength(200,
+                    message: 'Adresse : max 200 caractères'),
               ),
               const SizedBox(height: 12),
               AppTextField(
                 label: 'Profession',
                 controller: _professionCtrl,
                 prefixIcon: const Icon(Icons.work_outline),
+                validator: Validators.maxLength(80,
+                    message: 'Profession : max 80 caractères'),
               ),
             ]),
             const SizedBox(height: 16),
@@ -279,12 +317,36 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
                 controller: _typePieceCtrl,
                 hint: 'CNI, Passeport, Permis...',
                 prefixIcon: const Icon(Icons.badge_outlined),
+                validator: Validators.combine([
+                  Validators.maxLength(30,
+                      message: 'Type de pièce : max 30 caractères'),
+                  (v) {
+                    final type = v?.trim() ?? '';
+                    final num = _numPieceCtrl.text.trim();
+                    if (type.isEmpty && num.isNotEmpty) {
+                      return 'Type de pièce requis';
+                    }
+                    return null;
+                  },
+                ]),
               ),
               const SizedBox(height: 12),
               AppTextField(
                 label: 'Numéro de pièce',
                 controller: _numPieceCtrl,
                 prefixIcon: const Icon(Icons.numbers),
+                validator: Validators.combine([
+                  Validators.maxLength(40,
+                      message: 'Numéro de pièce : max 40 caractères'),
+                  (v) {
+                    final num = v?.trim() ?? '';
+                    final type = _typePieceCtrl.text.trim();
+                    if (num.isEmpty && type.isNotEmpty) {
+                      return 'Numéro de pièce requis';
+                    }
+                    return null;
+                  },
+                ]),
               ),
             ]),
 

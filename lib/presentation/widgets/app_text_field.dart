@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/utils/validators.dart';
 
 class AppTextField extends StatelessWidget {
   final String label;
@@ -37,6 +38,13 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveValidator = required
+        ? Validators.combine([
+            Validators.required(),
+            validator,
+          ])
+        : validator;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -61,7 +69,7 @@ class AppTextField extends StatelessWidget {
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
-          validator: validator,
+          validator: effectiveValidator,
           keyboardType: keyboardType,
           obscureText: obscureText,
           maxLines: obscureText ? 1 : maxLines,

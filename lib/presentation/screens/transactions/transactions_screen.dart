@@ -9,16 +9,47 @@ import '../../widgets/loading_overlay.dart';
 import '../../widgets/app_app_bar.dart';
 import '../../widgets/status_badge.dart';
 
-class TransactionsScreen extends ConsumerWidget {
+class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
+}
+
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
+  String _selectedFilter = 'TOUS';
+  String _searchQuery = '';
+
+  static const _filters = ['TOUS', 'DEPOT', 'RETRAIT', 'TRANSFERT'];
+  static const _filterLabels = {
+    'TOUS': 'Tous',
+    'DEPOT': 'Dépôts',
+    'RETRAIT': 'Retraits',
+    'TRANSFERT': 'Transferts',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    // Écouter les notifications WebSocket pour rafraîchir automatiquement
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(webSocketServiceProvider).notifications.listen((notification) {
+        if (notification.type.startsWith('TRANSACTION')) {
+          ref.invalidate(transactionsProvider);
+          ref.invalidate(comptesProvider);
+          ref.invalidate(dashboardProvider);
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final txAsync = ref.watch(transactionsProvider);
     final auth = ref.watch(authProvider);
-    final canCreate = auth?.isCaissier == true;
-    final canValidate = auth?.isGestionnaire == true;
-    final canExecute = auth?.isCaissier == true;
+    final canCreate = auth?.canDoTransactions == true;
+    final canValidate = auth?.canValidateSensitiveTransactions == true;
+    final canExecute = auth?.canExecuteSensitiveTransactions == true;
 
     return Scaffold(
       appBar: AppAppBar(
@@ -36,7 +67,7 @@ class TransactionsScreen extends ConsumerWidget {
           // Boutons d'opération
           if (canCreate)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
                 children: [
                   Expanded(
@@ -70,6 +101,65 @@ class TransactionsScreen extends ConsumerWidget {
               ),
             ),
 
+          // Filtres et recherche
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Column(
+              children: [
+                // Filtres par type
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: _filters.map<Widget>((filter) {
+                      final isSelected = _selectedFilter == filter;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(_filterLabels[filter] ?? filter),
+                      selected: isSelected,
+                      onSelected: (_) => setState(() => _selectedFilter = filter),
+                      selectedColor: AppTheme.primaryLight,
+                      labelStyle: TextStyle(
+                        color: isSelected ? AppTheme.primary : AppTheme.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                      backgroundColor: Colors.grey[100],
+                    ),
+                  );
+                }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Barre de recherche
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher une transaction...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => setState(() => _searchQuery = ''),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                ),
+              ],
+            ),
+          ),
+
           Expanded(
             child: txAsync.when(
               loading: () => const LoadingOverlay(),
@@ -78,10 +168,41 @@ class TransactionsScreen extends ConsumerWidget {
                 onRetry: () => ref.invalidate(transactionsProvider),
               ),
               data: (txs) {
-                if (txs.isEmpty) {
-                  return const EmptyView(
-                    message: 'Aucune transaction',
-                    icon: Icons.swap_horiz,
+                // Filtrer les transactions
+                var filteredTxs = txs;
+                if (_selectedFilter != 'TOUS') {
+                  filteredTxs = txs.where((tx) => tx.typeTransaction == _selectedFilter).toList();
+                }
+                if (_searchQuery.isNotEmpty) {
+                  final query = _searchQuery.toLowerCase();
+                  filteredTxs = filteredTxs.where((tx) =>
+                      tx.reference.toLowerCase().contains(query) ||
+                      (tx.nomClient?.toLowerCase().contains(query) ?? false) ||
+                      tx.numeroCompte.toLowerCase().contains(query) ||
+                      (tx.numeroCompteDestination?.toLowerCase().contains(query) ?? false)
+                  ).toList();
+                }
+
+                if (filteredTxs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: AppTheme.textSecondary.withValues(alpha: 0.3),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Aucune transaction trouvée',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
 
@@ -90,207 +211,17 @@ class TransactionsScreen extends ConsumerWidget {
                       ref.invalidate(transactionsProvider),
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: txs.length,
+                    itemCount: filteredTxs.length,
                     separatorBuilder: (_, _) =>
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                     itemBuilder: (ctx, i) {
-                      final tx = txs[i];
-                      return Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: _amountColor(tx)
-                                          .withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      _iconFor(tx),
-                                      color: _amountColor(tx),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                tx.typeLabel,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                            StatusBadge(
-                                              status: tx.statut,
-                                              label: tx.statutLabel,
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          tx.nomClient ?? tx.numeroCompte,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppTheme.textSecondary,
-                                          ),
-                                        ),
-                                        Text(
-                                          tx.reference,
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppTheme.textSecondary,
-                                            fontFamily: 'monospace',
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          _detailLine(tx),
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppTheme.textSecondary,
-                                          ),
-                                        ),
-                                        if (tx.motif != null &&
-                                            tx.motif!.trim().isNotEmpty)
-                                          Padding(
-                                            padding:
-                                                const EdgeInsets.only(top: 4),
-                                            child: Text(
-                                              'Motif : ${tx.motif}',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color:
-                                                    AppTheme.textSecondary,
-                                              ),
-                                            ),
-                                          ),
-                                        if (tx.motifRejet != null &&
-                                            tx.motifRejet!.trim().isNotEmpty)
-                                          Padding(
-                                            padding:
-                                                const EdgeInsets.only(top: 4),
-                                            child: Text(
-                                              'Rejet : ${tx.motifRejet}',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: AppTheme.error,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        Formatters.currency(tx.montant),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: _amountColor(tx),
-                                        ),
-                                      ),
-                                      Text(
-                                        Formatters.shortDate(
-                                            tx.dateExecution ??
-                                                tx.dateTransaction),
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              if (tx.isPendingValidation && canValidate) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () =>
-                                            _validerOperation(
-                                          context,
-                                          ref,
-                                          tx,
-                                          false,
-                                        ),
-                                        icon: const Icon(
-                                          Icons.close,
-                                          color: AppTheme.error,
-                                        ),
-                                        label: const Text(
-                                          'Rejeter',
-                                          style: TextStyle(
-                                            color: AppTheme.error,
-                                          ),
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          side: const BorderSide(
-                                            color: AppTheme.error,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () =>
-                                            _validerOperation(
-                                          context,
-                                          ref,
-                                          tx,
-                                          true,
-                                        ),
-                                        icon: const Icon(Icons.check),
-                                        label: const Text('Valider'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              AppTheme.success,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              if (tx.isValidated && canExecute) ...[
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () =>
-                                        _executerOperation(context, ref, tx),
-                                    icon: const Icon(Icons.payments_outlined),
-                                    label: Text(
-                                      tx.typeTransaction == 'RETRAIT'
-                                          ? 'Remettre les fonds'
-                                          : 'Exécuter le transfert',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
+                      final tx = filteredTxs[i];
+                      return _TransactionCard(
+                        tx: tx,
+                        canValidate: canValidate,
+                        canExecute: canExecute,
+                        onValidate: (approuve) => _validerOperation(context, ref, tx, approuve),
+                        onExecute: () => _executerOperation(context, ref, tx),
                       );
                     },
                   ),
@@ -319,7 +250,7 @@ class TransactionsScreen extends ConsumerWidget {
         builder: (ctx) => AlertDialog(
           title: const Text('Valider cette opération ?'),
           content: Text(
-            'Le ${tx.typeLabel.toLowerCase()} ${tx.reference} pourra ensuite être exécuté par le caissier.',
+            'Le ${tx.typeLabel.toLowerCase()} ${tx.reference} pourra ensuite être exécuté par le caissier ou le gestionnaire.',
           ),
           actions: [
             TextButton(
@@ -346,27 +277,19 @@ class TransactionsScreen extends ConsumerWidget {
             motifRejet: motifRejet,
           );
       ref.invalidate(transactionsProvider);
+      ref.invalidate(comptesProvider);
       ref.invalidate(dashboardProvider);
       ref.invalidate(creditsProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(approuve
-                ? 'Opération validée'
-                : 'Opération rejetée'),
-            backgroundColor:
-                approuve ? AppTheme.success : AppTheme.error,
-          ),
-        );
+        if (approuve) {
+          AppSnackBar.success(context, 'Opération validée');
+        } else {
+          AppSnackBar.error(context, 'Opération rejetée');
+        }
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppSnackBar.error(context, e.toString());
       }
     }
   }
@@ -379,11 +302,11 @@ class TransactionsScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer l’exécution'),
+        title: const Text("Confirmer l'exécution"),
         content: Text(
           tx.typeTransaction == 'RETRAIT'
               ? 'Confirmez-vous la remise des fonds au client ?'
-              : 'Confirmez-vous l’exécution définitive du transfert ?',
+              : "Confirmez-vous l'exécution définitive du transfert ?",
         ),
         actions: [
           TextButton(
@@ -405,21 +328,11 @@ class TransactionsScreen extends ConsumerWidget {
       ref.invalidate(comptesProvider);
       ref.invalidate(dashboardProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Opération exécutée avec succès'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        AppSnackBar.success(context, 'Opération exécutée avec succès');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppSnackBar.error(context, e.toString());
       }
     }
   }
@@ -456,8 +369,40 @@ class TransactionsScreen extends ConsumerWidget {
     controller.dispose();
     return result;
   }
+}
 
-  String _detailLine(TransactionModel tx) {
+class _TransactionCard extends StatelessWidget {
+  final TransactionModel tx;
+  final bool canValidate;
+  final bool canExecute;
+  final Function(bool) onValidate;
+  final VoidCallback onExecute;
+
+  const _TransactionCard({
+    required this.tx,
+    required this.canValidate,
+    required this.canExecute,
+    required this.onValidate,
+    required this.onExecute,
+  });
+
+  Color _amountColor() {
+    if (!tx.isExecuted && tx.isSensitive) {
+      return AppTheme.warning;
+    }
+    return tx.isCredit ? AppTheme.success : AppTheme.error;
+  }
+
+  IconData _iconFor() {
+    return switch (tx.typeTransaction) {
+      'DEPOT' => Icons.arrow_downward,
+      'TRANSFERT' => Icons.swap_horiz,
+      'RETRAIT' => Icons.arrow_upward,
+      _ => tx.isCredit ? Icons.arrow_downward : Icons.arrow_upward,
+    };
+  }
+
+  String _detailLine() {
     final details = <String>[
       tx.numeroCompte,
       if (tx.numeroCompteDestination != null &&
@@ -471,20 +416,242 @@ class TransactionsScreen extends ConsumerWidget {
     return details.join(' • ');
   }
 
-  Color _amountColor(TransactionModel tx) {
-    if (!tx.isExecuted && tx.isSensitive) {
-      return AppTheme.warning;
-    }
-    return tx.isCredit ? AppTheme.success : AppTheme.error;
-  }
+  @override
+  Widget build(BuildContext context) {
+    final amountColor = _amountColor();
+    final icon = _iconFor();
 
-  IconData _iconFor(TransactionModel tx) {
-    return switch (tx.typeTransaction) {
-      'DEPOT' => Icons.arrow_downward,
-      'TRANSFERT' => Icons.swap_horiz,
-      'RETRAIT' => Icons.arrow_upward,
-      _ => tx.isCredit ? Icons.arrow_downward : Icons.arrow_upward,
-    };
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/transactions/${tx.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: amountColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: amountColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                tx.typeLabel,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                            StatusBadge(
+                              status: tx.statut,
+                              label: tx.statutLabel,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          tx.nomClient ?? tx.numeroCompte,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          tx.reference,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        Formatters.currency(tx.montant),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: amountColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        Formatters.shortDate(
+                            tx.dateExecution ?? tx.dateTransaction),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _detailLine(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ),
+              if (tx.motif != null && tx.motif!.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Motif : ${tx.motif}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+              if (tx.motifRejet != null && tx.motifRejet!.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppTheme.error,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Rejet : ${tx.motifRejet}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (tx.isPendingValidation && canValidate) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => onValidate(false),
+                        icon: const Icon(
+                          Icons.close,
+                          color: AppTheme.error,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Rejeter',
+                          style: TextStyle(
+                            color: AppTheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppTheme.error),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => onValidate(true),
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text(
+                          'Valider',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (tx.isValidated && canExecute) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: onExecute,
+                    icon: const Icon(Icons.payments_outlined, size: 18),
+                    label: Text(
+                      tx.typeTransaction == 'RETRAIT'
+                          ? 'Remettre les fonds'
+                          : 'Exécuter le transfert',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -505,24 +672,24 @@ class _OpButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 4),
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 6),
             Text(
               label,
               style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: color,
-                  fontWeight: FontWeight.w600),
+                  fontWeight: FontWeight.w700),
             ),
           ],
         ),

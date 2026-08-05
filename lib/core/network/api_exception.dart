@@ -10,9 +10,21 @@ class ApiException implements Exception {
     final data = e.response?.data;
     String msg = 'Une erreur est survenue';
 
-    if (data is Map && data['message'] != null) {
-      msg = data['message'].toString();
-    } else {
+    if (data is Map) {
+      // Cas 1 : erreur de validation Spring — les détails sont dans data['data'] (Map<champ, message>)
+      final validationData = data['data'];
+      if (validationData is Map && validationData.isNotEmpty) {
+        // Concatène tous les messages de validation en une seule chaîne lisible
+        msg = validationData.values
+            .map((v) => v.toString())
+            .join('\n');
+      } else if (data['message'] != null) {
+        // Cas 2 : erreur métier avec message direct
+        msg = data['message'].toString();
+      }
+    }
+
+    if (msg == 'Une erreur est survenue') {
       switch (e.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
@@ -24,10 +36,7 @@ class ApiException implements Exception {
           break;
         case DioExceptionType.badResponse:
           final code = e.response?.statusCode;
-          // Essaie d'abord d'extraire le message du body
-          if (data is Map && data['message'] != null) {
-            msg = data['message'].toString();
-          } else if (code == 401) {
+          if (code == 401) {
             msg = 'Email ou mot de passe incorrect';
           } else if (code == 403) {
             msg = 'Accès non autorisé';

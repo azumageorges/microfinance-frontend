@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/client_model.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/client_avatar.dart';
 import '../../widgets/loading_overlay.dart';
@@ -133,7 +134,7 @@ class _CartesListScreenState extends ConsumerState<CartesListScreen>
 }
 
 class _ClientCarteList extends StatelessWidget {
-  final List<dynamic> clients;
+  final List<ClientModel> clients;
   final bool          avecCarte;
   final String        emptyMessage;
 

@@ -42,6 +42,7 @@ class _CarteMembreState extends ConsumerState<CarteMembre> {
   String?   _photoFileName;
   bool _uploadingPhoto  = false;
   bool _generatingCarte = false;
+  bool _deletingCarte  = false;
   String? _cheminPhotoMisAJour;
 
   bool get _hasPhotoServeur =>
@@ -127,6 +128,43 @@ class _CarteMembreState extends ConsumerState<CarteMembre> {
     if (ok == true) _emettreCarteAction();
   }
 
+  /// Supprime la carte membre du client.
+  Future<void> _confirmerEtSupprimer() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer la carte ?'),
+        content: const Text(
+          'Cette action est irréversible. Le numéro de membre sera supprimé.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      setState(() => _deletingCarte = true);
+      try {
+        await ref.read(carteRepositoryProvider).supprimerCarte(widget.clientId);
+        ref.invalidate(_carteProvider(widget.clientId));
+        ref.invalidate(clientsProvider);
+        if (mounted) _showSuccess('Carte supprimée ✓');
+      } catch (e) {
+        if (mounted) _showError(e.toString());
+      } finally {
+        if (mounted) setState(() => _deletingCarte = false);
+      }
+    }
+  }
+
   Future<void> _changerPhoto() async {
     await _choisirPhoto();
     if (_photoBytes == null) return;
@@ -178,6 +216,14 @@ class _CarteMembreState extends ConsumerState<CarteMembre> {
         title: const Text('Carte membre',
             style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [
+          carteAsync.maybeWhen(
+            data: (_) => IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppTheme.error),
+              tooltip: 'Supprimer la carte',
+              onPressed: _deletingCarte ? null : _confirmerEtSupprimer,
+            ),
+            orElse: () => const SizedBox(),
+          ),
           carteAsync.maybeWhen(
             data: (_) => IconButton(
               icon: const Icon(Icons.refresh),
@@ -745,7 +791,7 @@ class _TogoLogoBadge extends StatelessWidget {
   }
 }
 
-// ─── Badge microfinance ED (Entreprenariat & Développement) ───────────────────
+// ─── Badge institutionnel simplifié ───────────────────────────────────────────────
 
 class _InstitutionLogoBadge extends StatelessWidget {
   final double size;
@@ -808,60 +854,24 @@ class _InstitutionLogoBadge extends StatelessWidget {
                 ),
               ),
             ),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // "ED" en grand avec couleur or
-                Text(
-                  CarteTheme.institutionShort,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: CarteTheme.goldAccent,
-                    fontWeight: FontWeight.w900,
-                    fontSize: size * 0.50,
-                    letterSpacing: 2.0,
-                    height: 0.95,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black.withValues(alpha: 0.30),
-                        offset: Offset(0, size * 0.02),
-                        blurRadius: size * 0.04,
-                      ),
-                    ],
+            // Logo institutionnel centré
+            Text(
+              CarteTheme.institutionShort,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: CarteTheme.goldAccent,
+                fontWeight: FontWeight.w900,
+                fontSize: size * 0.42,
+                letterSpacing: 3.0,
+                height: 1.0,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    offset: Offset(0, size * 0.02),
+                    blurRadius: size * 0.05,
                   ),
-                ),
-                SizedBox(height: size * 0.03),
-                // Séparateur fin or
-                Container(
-                  width: size * 0.65,
-                  height: size * 0.025,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        CarteTheme.goldAccent.withValues(alpha: 0),
-                        CarteTheme.goldAccent.withValues(alpha: 0.80),
-                        CarteTheme.goldAccent.withValues(alpha: 0),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(size),
-                  ),
-                ),
-                SizedBox(height: size * 0.03),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: size * 0.06),
-                  child: Text(
-                    'MICROFINANCE',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      fontWeight: FontWeight.w700,
-                      fontSize: size * 0.145,
-                      letterSpacing: 0.8,
-                      height: 0.9,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

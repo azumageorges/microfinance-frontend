@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/validators.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../widgets/status_badge.dart';
@@ -20,7 +22,7 @@ class _ComptesListScreenState extends ConsumerState<ComptesListScreen> {
   String _filterType = 'TOUS';
 
   static const _types = [
-    'TOUS', 'EPARGNE', 'DAT', 'CREDIT', 'ACHAT', 'ENFANT', 'BLOQUE'
+    'TOUS', 'EPARGNE', 'DAT', 'CREDIT', 'ENFANT'
   ];
 
   static const _typeLabels = {
@@ -28,9 +30,7 @@ class _ComptesListScreenState extends ConsumerState<ComptesListScreen> {
     'EPARGNE': 'Épargne',
     'DAT': 'DAT',
     'CREDIT': 'Crédit',
-    'ACHAT': 'Achat',
     'ENFANT': 'Enfant',
-    'BLOQUE': 'Bloqué',
   };
 
   @override
@@ -85,7 +85,7 @@ class _ComptesListScreenState extends ConsumerState<ComptesListScreen> {
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: _types.map((type) {
+              children: _types.map<Widget>((type) {
                 final isSelected = _filterType == type;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -284,6 +284,7 @@ class _CreateCompteSheetState
       ),
       child: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -300,7 +301,6 @@ class _CreateCompteSheetState
                 DropdownMenuItem(value: 'EPARGNE', child: Text('Épargne')),
                 DropdownMenuItem(
                     value: 'DAT', child: Text('Dépôt à terme')),
-                DropdownMenuItem(value: 'ACHAT', child: Text('Achat')),
                 DropdownMenuItem(value: 'ENFANT', child: Text('Enfant')),
               ],
               onChanged: (v) => setState(() => _typeCompte = v!),
@@ -310,8 +310,13 @@ class _CreateCompteSheetState
               controller: _clientIdCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'ID du client *'),
-              validator: (v) =>
-                  v?.trim().isEmpty == true ? 'Requis' : null,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              validator: Validators.integer(
+                isRequired: true,
+                min: 1,
+                messageRequired: 'Champ requis',
+                messageInvalid: 'ID invalide',
+              ),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -319,6 +324,12 @@ class _CreateCompteSheetState
               keyboardType: TextInputType.number,
               decoration:
                   const InputDecoration(labelText: 'Montant initial (FCFA)'),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              validator: Validators.positiveNumber(
+                isRequired: false,
+                min: 0,
+                messageInvalid: 'Montant invalide',
+              ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 10),

@@ -31,4 +31,13 @@ class CarteRepository {
       throw ApiException.fromDioError(e);
     }
   }
+
+  /// Supprime la carte membre d'un client.
+  Future<void> supprimerCarte(int clientId) async {
+    try {
+      await _apiClient.dio.delete('/api/cartes/$clientId');
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
 }

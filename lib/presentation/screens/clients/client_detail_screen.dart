@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/carte_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../data/models/client_model.dart';
+import '../../../data/models/compte_model.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/client_avatar.dart';
 import '../../widgets/loading_overlay.dart';
@@ -26,6 +28,17 @@ class ClientDetailScreen extends ConsumerWidget {
         title: const Text('Détail client',
             style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [
+          // Bouton supprimer — Gestionnaire + Admin uniquement
+          if (auth?.isAdmin == true || auth?.isGestionnaire == true)
+            clientAsync.when(
+              data: (_) => IconButton(
+                icon: const Icon(Icons.delete_outline, color: AppTheme.error),
+                tooltip: 'Supprimer',
+                onPressed: () => confirmDelete(context, ref, clientId),
+              ),
+              loading: () => const SizedBox(),
+              error: (_, _) => const SizedBox(),
+            ),
           // Bouton carte — Gestionnaire + Admin uniquement
           if (auth?.isAdmin == true || auth?.isGestionnaire == true)
             clientAsync.when(
@@ -198,7 +211,7 @@ class ClientDetailScreen extends ConsumerWidget {
                         }
                         return Column(
                           children: comptes
-                              .map((c) => ListTile(
+                              .map<Widget>((c) => ListTile(
                                     onTap: () => context.push(
                                         '/comptes/${c.numeroCompte}'),
                                     leading: Container(
@@ -254,8 +267,7 @@ class ClientDetailScreen extends ConsumerWidget {
               ),
 
               // ── Carte membre ──────────────────────────────────────────
-              if (auth?.isAdmin == true || auth?.isGestionnaire == true) ...[
-                const SizedBox(height: 12),
+              if (auth?.isAdmin == true || auth?.isGestionnaire == true)
                 _CarteMiniCard(
                   client: client,
                   onViewCarte: () => context.push(
@@ -263,7 +275,6 @@ class ClientDetailScreen extends ConsumerWidget {
                     extra: client,
                   ),
                 ),
-              ],
 
               const SizedBox(height: 80),
             ],
@@ -275,12 +286,12 @@ class ClientDetailScreen extends ConsumerWidget {
 }
 
 // Providers paramétrés pour éviter les FutureProvider imbriqués
-final _clientProvider = FutureProvider.family<dynamic, int>(
-  (ref, id) => ref.watch(clientRepositoryProvider).getClientById(id),
+final _clientProvider = FutureProvider.family<ClientModel, int>(
+  (ref, id) => ref.read(clientRepositoryProvider).getClientById(id),
 );
 
-final _clientComptesProvider = FutureProvider.family<dynamic, int>(
-  (ref, id) => ref.watch(compteRepositoryProvider).getComptesByClient(id),
+final _clientComptesProvider = FutureProvider.family<List<CompteModel>, int>(
+  (ref, id) => ref.read(compteRepositoryProvider).getComptesByClient(id),
 );
 
 // ─── Widgets internes ─────────────────────────────────────────────────────────
@@ -304,7 +315,7 @@ class _InfoCard extends StatelessWidget {
                 style: const TextStyle(
                     fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
-            ...items.map((item) => Padding(
+            ...items.map<Widget>((item) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,5 +514,42 @@ class _BeneficiairesCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+Future<void> confirmDelete(BuildContext context, WidgetRef ref, int clientId) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Supprimer ce client ?'),
+      content: const Text(
+        'Cette action est irréversible. Le client sera supprimé définitivement '
+        's\'il n\'a pas de comptes ni de crédits actifs.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+          child: const Text('Supprimer'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true && context.mounted) {
+    try {
+      await ref.read(clientRepositoryProvider).deleteClient(clientId);
+      if (context.mounted) {
+        context.pop();
+        ref.invalidate(clientsProvider);
+        AppSnackBar.success(context, 'Client supprimé');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackBar.error(context, e.toString());
+      }
+    }
   }
 }
