@@ -24,7 +24,7 @@ class AppDatabase {
 
   static Future<AppDatabase> open() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
+    final path   = join(dbPath, _dbName);
 
     final database = await openDatabase(
       path,

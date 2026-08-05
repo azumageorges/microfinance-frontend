@@ -85,9 +85,13 @@ class CreditModel {
   final double miseQuotidienne;
   final double fraisCredit;
   final int nombreEcheances;
+  final double montantUneEcheance;   // montant de chaque échéance (= mise quotidienne)
   final double? totalARembourser;
   final double totalRembourse;
   final double? resteARembourser;
+  // Frais — payés séparément AVANT les échéances de capital
+  final bool fraisPaye;
+  final DateTime? datePaiementFrais;
   final String statut;
   final String? statutLabelBackend;
   final String? motifDemande;
@@ -113,9 +117,12 @@ class CreditModel {
     required this.miseQuotidienne,
     required this.fraisCredit,
     required this.nombreEcheances,
+    this.montantUneEcheance = 0,
     this.totalARembourser,
     required this.totalRembourse,
     this.resteARembourser,
+    this.fraisPaye = false,
+    this.datePaiementFrais,
     required this.statut,
     this.statutLabelBackend,
     this.motifDemande,
@@ -188,6 +195,9 @@ class CreditModel {
             ? _intValue(json['nombreEcheances'])
             :
             ((json['echeances'] as List<dynamic>? ?? []).length),
+        montantUneEcheance: json['montantUneEcheance'] != null
+            ? _doubleValue(json['montantUneEcheance'])
+            : _doubleValue(json['miseQuotidienne']), // fallback = mise quotidienne
         totalARembourser: json['totalARembourser'] != null
             ? _doubleValue(json['totalARembourser'])
             : null,
@@ -195,6 +205,8 @@ class CreditModel {
         resteARembourser: json['resteARembourser'] != null
             ? _doubleValue(json['resteARembourser'])
             : null,
+        fraisPaye: _boolValue(json['fraisPaye']),
+        datePaiementFrais: _dateTimeValue(json['datePaiementFrais']),
         statut: _stringValue(json['statut'], 'EN_ATTENTE'),
         statutLabelBackend: json['statutLabel'] != null
             ? _stringValue(json['statutLabel'])

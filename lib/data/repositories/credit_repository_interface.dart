@@ -17,4 +17,5 @@ abstract class ICreditRepository {
   Future<CreditModel> validerDeblocage(int id, {required bool approuve, String? motifRejet});
   Future<CreditModel> executerDeblocage(int id);
   Future<CreditModel> rembourserEcheance(int echeanceId);
+  Future<CreditModel> payerFrais(int creditId);
 }

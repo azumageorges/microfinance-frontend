@@ -174,6 +174,16 @@ class CreditRepository implements ICreditRepository {
   }
 
   @override
+  Future<CreditModel> payerFrais(int creditId) async {
+    try {
+      final res = await _apiClient.dio.patch('/api/credits/$creditId/payer-frais');
+      return CreditModel.fromJson(res.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
+  @override
   Future<CreditModel> demanderDeblocage(int id) async {
     try {
       final res = await _apiClient.dio.patch('/api/credits/$id/demander-deblocage');
